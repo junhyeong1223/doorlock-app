@@ -697,19 +697,19 @@ export default function App() {
                           {r.상태==="예약"&&<>
                             <button className="rc-btn" style={{borderColor:"#7c3aed",color:"#7c3aed",background:"#f5f3ff"}} onClick={()=>{updateStatus(r.ID,"출동중");showToast("🚗 출동 시작!");}}>🚗 출동 시작</button>
                             <button className="rc-btn" onClick={()=>updateStatus(r.ID,"견적대기")}>↩</button>
-                            <button className="rc-btn red" onClick={()=>setShowCancel({id:r.ID,status:"견적대기"})}>취소</button>
+                            <button className="rc-btn red" onClick={()=>setShowCancel({id:r.ID,status:"견적대기",channel:r.채널})}>취소</button>
                             <button className="rc-btn" style={{borderColor:"#ddd",color:"#aaa"}} onClick={(e)=>{e.stopPropagation();deleteRecord(r.ID);}}>🗑</button>
                           </>}
                           {r.상태==="견적대기"&&<>
                             <button className="rc-btn blue" onClick={()=>{updateStatus(r.ID,"출동중");showToast("🚗 출동 시작!");}}>🚗 출동 시작</button>
                             <button className="rc-btn" style={{borderColor:"#7c3aed",color:"#7c3aed",background:"#f5f3ff"}} onClick={()=>{setReserveForm({date:"",time:""});setShowReserve({id:r.ID});}}>📅 예약</button>
-                            <button className="rc-btn red" onClick={()=>setShowCancel({id:r.ID,status:r.상태})}>취소</button>
+                            <button className="rc-btn red" onClick={()=>setShowCancel({id:r.ID,status:r.상태,channel:r.채널})}>취소</button>
                             <button className="rc-btn" style={{borderColor:"#ddd",color:"#aaa"}} onClick={()=>deleteRecord(r.ID)}>🗑</button>
                           </>}
                           {r.상태==="출동중"&&<>
                             <button className="rc-btn" style={{borderColor:"#d97706",color:"#d97706",background:"#fffbeb"}} onClick={()=>updateStatus(r.ID,"작업중")}>🔧 작업 시작</button>
                             <button className="rc-btn" onClick={()=>updateStatus(r.ID,"견적대기")}>↩</button>
-                            <button className="rc-btn red" onClick={()=>setShowCancel({id:r.ID,status:r.상태})}>취소</button>
+                            <button className="rc-btn red" onClick={()=>setShowCancel({id:r.ID,status:r.상태,channel:r.채널})}>취소</button>
                           </>}
                           {r.상태==="작업중"&&<>
                             <button className="rc-btn green" onClick={()=>loadToFinal(r)}>✅ 최종 견적서</button>
@@ -895,16 +895,16 @@ export default function App() {
                       {r.상태==="예약"&&<>
                         <button className="rc-btn blue" onClick={()=>{updateStatus(r.ID,"출동중");showToast("🚗 출동 시작!");}}>🚗 출동 시작</button>
                         <button className="rc-btn" onClick={()=>updateStatus(r.ID,"견적대기")}>견적대기로</button>
-                        <button className="rc-btn red" onClick={()=>setShowCancel({id:r.ID,status:"견적대기"})}>취소</button>
+                        <button className="rc-btn red" onClick={()=>setShowCancel({id:r.ID,status:"견적대기",channel:r.채널})}>취소</button>
                       </>}
                       {r.상태==="견적대기"&&<>
                         <button className="rc-btn blue" onClick={()=>{updateStatus(r.ID,"출동중");showToast("🚗 출동 시작!");}}>🚗 출동 시작</button>
-                        <button className="rc-btn red" onClick={()=>setShowCancel({id:r.ID,status:r.상태})}>취소</button>
+                        <button className="rc-btn red" onClick={()=>setShowCancel({id:r.ID,status:r.상태,channel:r.채널})}>취소</button>
                       </>}
                       {r.상태==="출동중"&&<>
                         <button className="rc-btn" style={{borderColor:"#d97706",color:"#d97706",background:"#fffbeb"}} onClick={()=>updateStatus(r.ID,"작업중")}>🔧 작업 시작</button>
                         <button className="rc-btn" onClick={()=>updateStatus(r.ID,"견적대기")}>↩</button>
-                        <button className="rc-btn red" onClick={()=>setShowCancel({id:r.ID,status:r.상태})}>취소</button>
+                        <button className="rc-btn red" onClick={()=>setShowCancel({id:r.ID,status:r.상태,channel:r.채널})}>취소</button>
                       </>}
                       {r.상태==="작업중"&&<>
                         <button className="rc-btn green" onClick={()=>{loadToFinal(r);setTab("final");}}>✅ 최종 견적서</button>
@@ -1152,11 +1152,15 @@ export default function App() {
           </button>
         </>}
 
-        {/* ══════════ 최초 견적서 카드 ══════════ */}
+        {/* ══════════ 최초 견적서 카드 (모달) ══════════ */}
         {tab==="first" && fqStep==="card" && (
-          <div style={{padding:"20px 16px"}}>
+          <div style={{
+            position:"fixed",top:0,left:0,right:0,bottom:0,
+            background:"rgba(0,0,0,0.85)",zIndex:200,
+            overflowY:"auto",padding:"20px 16px 40px",
+          }}>
             {/* 캡처용 카드 */}
-            <div style={{background:"#111",borderRadius:20,overflow:"hidden",marginBottom:16,boxShadow:"0 6px 24px rgba(0,0,0,.15)"}}>
+            <div id="fq-card-capture" style={{background:"#111",borderRadius:20,overflow:"hidden",marginBottom:16,boxShadow:"0 6px 24px rgba(0,0,0,.3)"}}>
               <div style={{padding:"22px 22px 18px"}}>
                 <div style={{display:"inline-block",background:"rgba(255,255,255,.1)",color:"rgba(255,255,255,.6)",fontSize:10,fontWeight:700,letterSpacing:2,padding:"4px 10px",borderRadius:20,marginBottom:12}}>방문 견적서 · ESTIMATE</div>
                 <div style={{color:"#fff",fontSize:20,fontWeight:900,letterSpacing:"-.5px",marginBottom:8}}>도어락 · 열쇠 전문 출장</div>
@@ -1231,15 +1235,29 @@ export default function App() {
                 {fq.memo&&<div style={{marginTop:12,background:"#f8f8f8",borderRadius:11,padding:"12px 14px",fontSize:12,color:"#666",lineHeight:1.7}}>💬 {fq.memo}</div>}
               </div>
               <div style={{padding:"14px 22px",display:"flex",justifyContent:"space-between",alignItems:"center",borderTop:"1px solid #f0f0f0",background:"#fff"}}>
-                <div style={{fontSize:11,color:"#ccc"}}>출장비 {fmt(TRAVEL_FEE)}원 포함</div>
+                <div style={{fontSize:11,color:"#ccc"}}>출장비 {fmt(fqTravelFee)}원 포함</div>
                 <div style={{fontSize:11,color:"#ccc",fontWeight:700}}>{todayStr()}</div>
               </div>
             </div>
 
             {/* 버튼 */}
-            <div style={{display:"flex",gap:8}}>
+            <div style={{display:"flex",gap:8,marginTop:16}}>
               <button className="act" onClick={()=>setFqStep("form")}>← 수정</button>
-              <button className="act" onClick={()=>showToast("📸 화면을 캡처해서 카톡으로 보내세요!")}>📸 캡처 전송</button>
+              <button className="act" style={{flex:1,background:"#2563eb",borderColor:"#2563eb",color:"#fff"}}
+                onClick={async()=>{
+                  try {
+                    const el = document.getElementById("fq-card-capture");
+                    const html2canvas = (await import("https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.esm.js")).default;
+                    const canvas = await html2canvas(el, {scale:2, useCORS:true, backgroundColor:"#111"});
+                    const link = document.createElement("a");
+                    link.download = `견적서_${todayStr()}.png`;
+                    link.href = canvas.toDataURL("image/png");
+                    link.click();
+                    showToast("📸 이미지 저장됐어요!");
+                  } catch(e) {
+                    showToast("📸 화면 캡처 후 카톡으로 보내세요!", "error");
+                  }
+                }}>📸 이미지 저장</button>
               <button className="act primary" onClick={()=>{
                 saveFirstQuote("견적대기");
                 showToast("✅ 견적대기로 저장됐어요!");
@@ -1523,7 +1541,7 @@ export default function App() {
                 {/* 출동 후 취소 */}
                 <h3 style={{marginBottom:8}}>취소 사유</h3>
                 <div style={{background:"#f0fdf4",border:"1px solid #bbf7d0",borderRadius:10,padding:"10px 14px",marginBottom:14,fontSize:13,color:"#16a34a",lineHeight:1.6}}>
-                  ✅ 출동 후 취소 — <strong>출장비 30,000원 수익 확정</strong>
+                  ✅ 출동 후 취소 — <strong>출장비 {showCancel.channel==="soomgo"?"10,000":"30,000"}원 수익 확정</strong>
                 </div>
                 <div className="cancel-opts">
                   {[
@@ -1536,13 +1554,14 @@ export default function App() {
                     const hasTravelFee = r.travel;
                     return (
                       <button key={r.label} className="cancel-opt" onClick={()=>{
+                        const tFee = showCancel.channel==="soomgo" ? 10000 : 30000;
                         updateStatus(showCancel.id,"취소",{
                           취소사유:r.label,
-                          총금액: hasTravelFee?30000:0,
-                          준형수령액: hasTravelFee?30000:0,
+                          총금액: hasTravelFee?tFee:0,
+                          준형수령액: hasTravelFee?tFee:0,
                         });
                         setShowCancel(null);
-                        if(hasTravelFee) showToast("✅ 출장비 30,000원 수익 확정!");
+                        if(hasTravelFee) showToast(`✅ 출장비 ${fmt(tFee)}원 수익 확정!`);
                         else showToast("출장비 미청구 처리됨","error");
                       }}>
                         <span>{r.label}</span>
@@ -1797,7 +1816,7 @@ function FinalQuoteView({ fnq, setFnq, onSave, onBack, showToast }) {
             {f.address&&<div className="qcard-info">📍 {f.address}</div>}
           </div>
           <div className="qcard-body">
-            <div className="line-item"><span className="line-label">출장비</span><span className="line-price">{fmt(30000)}원</span></div>
+            <div className="line-item"><span className="line-label">출장비</span><span className="line-price">{fmt(fnqTravelFee)}원</span></div>
             {needOpen&&f.openItems.map(i=>(
               <div key={i.id} className="line-item">
                 <span className="line-label" style={{fontWeight:700}}>{i.label} 개문{i.qty>1?` ×${i.qty}`:""}</span>
@@ -1938,12 +1957,17 @@ function FinalQuoteView({ fnq, setFnq, onSave, onBack, showToast }) {
             {typeOpts.map(t=><button key={t} className={`filter-btn ${f.filterType===t?"on":""}`} onClick={()=>set("filterType",t)}>{t}</button>)}
           </div>
           <div className="product-list">
-            {filteredProducts.map(p=>(
+            {filteredProducts.map(p=>{
+              const displayPrice = fnqIsSoomgo ? soomgoPrice(p.price) : p.price;
+              return (
               <div key={p.id} className={`product-item ${(f.products||[]).find(x=>x.id===p.id)?"on":""}`} onClick={()=>toggleProduct(p)}>
                 <div><div className="pname">{p.brand} {p.name}</div><div className="pbrand">{p.type}{p.note?` · ${p.note}`:""}</div></div>
-                <div className="pprice">{fmt(p.price)}원</div>
+                <div style={{textAlign:"right"}}>
+                  <div className="pprice">{fmt(displayPrice)}원</div>
+                  {fnqIsSoomgo&&<div style={{fontSize:10,color:"rgba(255,255,255,.5)"}}>정가 {fmt(p.price)}원</div>}
+                </div>
               </div>
-            ))}
+            );})}
           </div>
 
           {/* 선택된 제품 수량 조절 */}
@@ -2010,7 +2034,7 @@ function FinalQuoteView({ fnq, setFnq, onSave, onBack, showToast }) {
           <div className="ptitle">총액 확인</div>
           <div style={{background:"#f8f8f8",borderRadius:12,padding:"14px 16px",marginBottom:12}}>
             <div style={{display:"flex",flexDirection:"column",gap:7}}>
-              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#aaa"}}><span>출장비</span><span>{fmt(30000)}원</span></div>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#aaa"}}><span>출장비</span><span>{fmt(fnqTravelFee)}원</span></div>
               {needOpen&&f.openItems.map(i=>(
                 <div key={i.id} style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#aaa"}}>
                   <span>{i.label} 개문{i.qty>1?` ×${i.qty}`:""}</span><span>{fmt((i.customPrice||i.actual)*i.qty)}원</span>
