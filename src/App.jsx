@@ -257,12 +257,56 @@ export default function App() {
   // ── 데이터 로드 ──
   const loadRecords = async () => {
     setLoading(true);
-    const monthStr = `${year}-${String(month+1).padStart(2,"0")}`;
-    const data = await api.getMonth(monthStr);
-    setRecords(Array.isArray(data) ? data : []);
-    // 전체 기록도 로드 (검색용)
-    const allData = await api.getAll();
-    setAllTimeRecords(Array.isArray(allData) ? allData : []);
+    try {
+      const monthStr2 = `${year}-${String(month+1).padStart(2,"0")}`;
+      const data = await api.getMonth(monthStr2);
+      const mapped = (Array.isArray(data)?data:[]).map(r=>({
+        ...r,
+        ID: String(r.ID||r["ID"]||""),
+        날짜: r["날짜"]||r.date||"",
+        시간: r["시간"]||r.time||"",
+        채널: r["채널"]||r.channel||"",
+        상태: r["상태"]||r.status||"견적대기",
+        연락처: r["연락처"]||r.phone||"",
+        주소: r["주소"]||r.address||"",
+        작업유형: r["작업유형"]||r.workType||"",
+        개문유형: r["개문유형"]||r.openType||"",
+        제품명: r["제품명"]||r.product||"",
+        총금액: Number(r["총금액"]||r.total||0),
+        준형수령액: Number(r["준형수령액"]||r.myEarnings||0),
+        자재원가: Number(r["자재원가"]||r.materialCost||0),
+        할인금액: Number(r["할인금액"]||r.discount||0),
+        현장메모: r["현장메모"]||r.note||"",
+        취소사유: r["취소사유"]||r.cancelReason||"",
+        결제방법: r["결제방법"]||"",
+        영수증: r["영수증"]||"",
+        결제완료: r["결제완료"]||false,
+        부가세: Number(r["부가세"]||0),
+        개문금액: Number(r["개문금액"]||0),
+        설치금액: Number(r["설치금액"]||0),
+        출장비: Number(r["출장비"]||30000),
+      }));
+      setRecords(mapped);
+      const allData = await api.getAll();
+      const allMapped = (Array.isArray(allData)?allData:[]).map(r=>({
+        ...r,
+        ID: String(r.ID||""),
+        날짜: r["날짜"]||"", 시간: r["시간"]||"",
+        채널: r["채널"]||"", 상태: r["상태"]||"견적대기",
+        연락처: r["연락처"]||"", 주소: r["주소"]||"",
+        작업유형: r["작업유형"]||"", 개문유형: r["개문유형"]||"",
+        제품명: r["제품명"]||"",
+        총금액: Number(r["총금액"]||0),
+        준형수령액: Number(r["준형수령액"]||0),
+        자재원가: Number(r["자재원가"]||0),
+        현장메모: r["현장메모"]||"",
+        결제방법: r["결제방법"]||"",
+        결제완료: r["결제완료"]||false,
+      }));
+      setAllTimeRecords(allMapped);
+    } catch(e) {
+      console.error("loadRecords error:", e);
+    }
     setLoading(false);
   };
 
