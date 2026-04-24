@@ -17,23 +17,24 @@ const OPEN_TYPES = [
 ];
 
 const INSTALL_TYPES = [
-  { id: "key",  label: "열쇠",   base: 50000,  real: 50000   },
-  { id: "aux",  label: "보조키", base: 180000, real: 180000  },
-  { id: "main", label: "주키",   base: 230000, real: 230000  },
-  { id: "push", label: "푸쉬풀", base: 350000, real: 350000  },
-  { id: "sash", label: "샷시문", base: 250000, real: 250000  },
-  { id: "etc",  label: "기타",   base: 0,      real: 0       },
+  { id: "key",  label: "열쇠",     base: 50000,  real: 50000   },
+  { id: "aux",  label: "보조키",   base: 180000, real: 180000  },
+  { id: "main", label: "주키",     base: 230000, real: 230000  },
+  { id: "push", label: "푸쉬풀",   base: 350000, real: 350000  },
+  { id: "sash", label: "강화유리문", base: 250000, real: 250000  },
+  { id: "etc",  label: "기타",     base: 0,      real: 0       },
 ];
 
 const ETC_INSTALL_ITEMS = [
-  { id:"horseshoe", label:"말발굽",     price:50000  },
-  { id:"closer",    label:"도어클로저", price:70000  },
+  { id:"safety_b",  label:"안전고리 기본형",  price:50000  },
+  { id:"safety_p",  label:"안전고리 고급형",  price:70000  },
+  { id:"closer",    label:"도어클로저",       price:70000  },
   { id:"closer_s",  label:"도어클로저 정지형", price:100000 },
-  { id:"safety",    label:"안전고리 기본", price:50000 },
-  { id:"safety_p",  label:"안전고리 고급", price:70000 },
-  { id:"handle",    label:"컵핸들",     price:60000  },
-  { id:"lever",     label:"방문레바",   price:50000  },
-  { id:"gate_lock", label:"현관정",     price:50000  },
+  { id:"horseshoe", label:"말발굽",           price:50000  },
+  { id:"handle",    label:"컵핸들",           price:60000  },
+  { id:"lever",     label:"방문레바",         price:50000  },
+  { id:"gate_lock", label:"현관정",           price:50000  },
+  { id:"custom",    label:"직접입력",         price:0      },
 ];
 
 const PAYMENT_METHODS = [
@@ -89,12 +90,13 @@ const SURCHARGES = [
 ];
 
 const CANCEL_REASONS = [
-  { label:"고객 변심",      travel:true  },
-  { label:"타업체 선택",    travel:true  },
-  { label:"출동 중 취소",   travel:true  },
-  { label:"연락 두절",      travel:true  },
+  { label:"고객 변심",          travel:true  },
+  { label:"타업체 선택",        travel:true  },
+  { label:"출동 중 취소",       travel:true  },
+  { label:"연락 두절",          travel:true  },
+  { label:"기타 (출장비 O)",    travel:true  },
+  { label:"기타 (출장비 X)",    travel:false },
   { label:"작업 불가 (기술 부족)", travel:false },
-  { label:"기타",           travel:true  },
 ];
 const TRAVEL_FEE = 30000;
 const TRAVEL_FEE_SOOMGO = 10000;
@@ -143,31 +145,52 @@ const getFirstDayOfMonth = (y,m) => new Date(y,m,1).getDay();
 const api = {
   getMonth: async (month) => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return [];
-    const res = await fetch(`${SCRIPT_URL}?action=getMonth&month=${month}`);
-    return res.json();
+    try {
+      const res = await fetch(`${SCRIPT_URL}?action=getMonth&month=${month}`);
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch(e) { return []; }
+  },
+  getAll: async () => {
+    if (SCRIPT_URL === "여기에_URL_붙여넣기") return [];
+    try {
+      const res = await fetch(`${SCRIPT_URL}?action=getAll`);
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch(e) { return []; }
   },
   save: async (record) => {
-    if (SCRIPT_URL === "여기에_URL_붙여넣기") {
-      return { success:true, id: Date.now().toString() };
-    }
-    const res = await fetch(SCRIPT_URL, {
-      method:"POST", body:JSON.stringify({ action:"save", record })
-    });
-    return res.json();
+    if (SCRIPT_URL === "여기에_URL_붙여넣기") return { success:true, id: Date.now().toString() };
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method:"POST",
+        headers:{"Content-Type":"text/plain"},
+        body:JSON.stringify({ action:"save", record })
+      });
+      return res.json();
+    } catch(e) { return { success:true, id: Date.now().toString() }; }
   },
   update: async (id, fields) => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return { success:true };
-    const res = await fetch(SCRIPT_URL, {
-      method:"POST", body:JSON.stringify({ action:"update", id, fields })
-    });
-    return res.json();
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method:"POST",
+        headers:{"Content-Type":"text/plain"},
+        body:JSON.stringify({ action:"update", id, fields })
+      });
+      return res.json();
+    } catch(e) { return { success:true }; }
   },
   delete: async (id) => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return { success:true };
-    const res = await fetch(SCRIPT_URL, {
-      method:"POST", body:JSON.stringify({ action:"delete", id })
-    });
-    return res.json();
+    try {
+      const res = await fetch(SCRIPT_URL, {
+        method:"POST",
+        headers:{"Content-Type":"text/plain"},
+        body:JSON.stringify({ action:"delete", id })
+      });
+      return res.json();
+    } catch(e) { return { success:true }; }
   },
 };
 
@@ -188,7 +211,7 @@ export default function App() {
   const now = new Date();
   const [year,  setYear]  = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth());
-  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(todayStr());
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [viewRecord, setViewRecord] = useState(null); // 완료 카드 상세 모달
   const [showCancel, setShowCancel] = useState(null);
@@ -197,8 +220,10 @@ export default function App() {
   const [reserveForm, setReserveForm] = useState({date:"", time:""});
   const [showAddRecord, setShowAddRecord] = useState(false);
   const [addForm, setAddForm] = useState({
-    channel:"office", time:"", workType:"", openType:"",
-    product:"", total:"", myEarnings:"", note:"", status:"완료"
+    channel:"office", time:"", workType:"",
+    openItems:[], products:[], productFilter:"전체",
+    note:"", status:"완료", phone:"", address:"",
+    noTravel:false,
   });
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -206,13 +231,17 @@ export default function App() {
   const [productList, setProductList] = useState([]);
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
-  const [productForm, setProductForm] = useState({name:"",brand:"",type:"",price:"",cost:"",desc:""});
+  const [productForm, setProductForm] = useState({name:"",brand:"",type:"",price:"",cost:"",desc:"",note:""});
+  const [prodBrandFilter, setProdBrandFilter] = useState("전체");
+  const [prodTypeFilter,  setProdTypeFilter]  = useState("전체");
+  const [prodPriceMode,   setProdPriceMode]   = useState("office"); // office | soomgo
+  const [selectedProd,    setSelectedProd]    = useState(null);
 
   // 최초 견적서 상태
   const [fq, setFq] = useState({
     channel:null, phone:"", address:"", workType:null,
     openItems:[], installItems:[], surcharges:[], memo:"",
-    reserveDate:"", reserveTime:"",
+    reserveDate:"", reserveTime:"", noTravel:false,
   });
   const [fqStep, setFqStep] = useState("form"); // form | card
 
@@ -313,7 +342,7 @@ export default function App() {
     if(SCRIPT_URL!=="여기에_URL_붙여넣기") {
       api.save(record).then(()=>loadRecords()).catch(()=>{});
     }
-    setFq({channel:null,phone:"",address:"",workType:null,openItems:[],installItems:[],surcharges:[],memo:"",reserveDate:"",reserveTime:""});
+    setFq({channel:null,phone:"",address:"",workType:null,openItems:[],installItems:[],surcharges:[],memo:"",reserveDate:"",reserveTime:"",noTravel:false});
     setFqStep("form");
     setTab(isReserve?"pending":"calendar");
     if(!isReserve) setSelectedDate(todayStr());
@@ -323,7 +352,7 @@ export default function App() {
   const fqNeedOpen    = fq.workType?.id==="open"    || fq.workType?.id==="both";
   const fqNeedInstall = fq.workType?.id==="install" || fq.workType?.id==="both";
   const isSoomgo      = fq.channel?.id==="soomgo";
-  const fqTravelFee   = isSoomgo ? TRAVEL_FEE_SOOMGO : TRAVEL_FEE;
+  const fqTravelFee   = fq.noTravel ? 0 : (isSoomgo ? TRAVEL_FEE_SOOMGO : TRAVEL_FEE);
   const fqOpenTotal   = fq.openItems.reduce((a,i)=>a+(isSoomgo ? soomgoOpen(i.actual) : i.actual)*i.qty, 0);
   const fqInstallPrice= fqNeedInstall ? fq.installItems.reduce((a,i)=>{
     if(i.id==="etc") return a + (i.etcPrice||0);
@@ -372,6 +401,7 @@ export default function App() {
       const fields = {
         상태:"완료", 총금액:total, 준형수령액:myEarnings,
         할인금액:discount, 자재원가:materialCost, 현장메모:note,
+        출장비: breakdown.출장비||TRAVEL_FEE,
         제품명: breakdown.설치제품||"",
         개문내역: breakdown.개문내역||"",
         개문금액: breakdown.개문금액||0,
@@ -468,9 +498,10 @@ export default function App() {
         .wd{text-align:center;font-size:11px;font-weight:700;color:rgba(255,255,255,.35);padding:4px 0;}
         .days{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;}
         .day-cell{
-          height:40px;border-radius:8px;
+          min-height:62px;border-radius:8px;
           display:flex;flex-direction:column;
-          align-items:center;justify-content:center;
+          align-items:center;justify-content:flex-start;
+          padding-top:6px;
           cursor:pointer;transition:all .15s;
         }
         .day-cell.empty{background:transparent !important;cursor:default;pointer-events:none;}
@@ -611,9 +642,12 @@ export default function App() {
               <div className="weekdays">{WEEKDAYS.map(w=><div key={w} className="wd">{w}</div>)}</div>
               <div className="days">
                 {cells.map((d,i)=>{
-                  if(!d) return <div key={i} style={{height:40}}/>;
+                  if(!d) return <div key={i} style={{height:52}}/>;
                   const ds=dateStr(d);
                   const recs=ds?(byDate[ds]||[]):[];
+                  const dayDone = recs.filter(r=>r.상태==="완료").length;
+                  const dayReserve = recs.filter(r=>r.상태==="예약").length;
+                  const dayEarnings = recs.filter(r=>r.상태==="완료"||(r.상태==="취소"&&Number(r.총금액||0)>0)).reduce((a,r)=>a+Number(r.준형수령액||0),0);
                   return (
                     <div key={i}
                       className={["day-cell",recs.length?"has-rec":"",selectedDate===ds?"sel":"",isToday(d)?"today":""].join(" ")}
@@ -622,6 +656,13 @@ export default function App() {
                       {recs.length>0&&<div className="day-dot">
                         {recs.slice(0,3).map((r,j)=>{const dc={"완료":"done","예약":"reserve","작업중":"wait","출동중":"office","취소":"cancel"}[r.상태]||(r.채널==="soomgo"?"soomgo":"office");return <div key={j} className={`dot ${dc}`}/>;})}
                       </div>}
+                      {(dayDone>0||dayReserve>0||dayEarnings>0)&&(
+                        <div style={{width:"100%",padding:"0 2px",marginTop:2}}>
+                          {dayDone>0&&<div style={{color:"#4ade80",fontWeight:700,fontSize:8,textAlign:"center",lineHeight:1.3}}>완료{dayDone}</div>}
+                          {dayReserve>0&&<div style={{color:"#a78bfa",fontWeight:700,fontSize:8,textAlign:"center",lineHeight:1.3}}>예약{dayReserve}</div>}
+                          {dayEarnings>0&&<div style={{color:"#fbbf24",fontWeight:700,fontSize:7,textAlign:"center",lineHeight:1.3}}>{fmt(dayEarnings)}</div>}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -744,64 +785,154 @@ export default function App() {
         </>}
 
         {/* ══════════ 자재 목록 탭 ══════════ */}
-        {tab==="products" && <>
+        {tab==="products" && (()=>{
+          const allProds = [...PRODUCTS, ...productList];
+          const brands = ["전체", ...new Set(allProds.map(p=>p.brand))];
+          const types  = ["전체", ...new Set(allProds.map(p=>p.type))];
+          const filtered = allProds.filter(p=>
+            (prodBrandFilter==="전체"||p.brand===prodBrandFilter) &&
+            (prodTypeFilter==="전체"||p.type===prodTypeFilter)
+          );
+          return <>
           <div className="page-top">
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%"}}>
               <div>
                 <div className="page-title">자재 목록</div>
-                <div className="page-sub">제품 관리</div>
+                <div className="page-sub">{allProds.length}개 제품</div>
               </div>
-              <button style={{
-                padding:"8px 16px",borderRadius:20,border:"none",
-                background:"#111",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"
-              }} onClick={()=>{setProductForm({name:"",brand:"",type:"",price:"",cost:"",desc:""});setEditProduct(null);setShowAddProduct(true);}}>
+              <button style={{padding:"8px 16px",borderRadius:20,border:"none",background:"#111",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}
+                onClick={()=>{setProductForm({name:"",brand:"",type:"",price:"",cost:"",desc:"",note:""});setShowAddProduct(true);}}>
                 + 추가
               </button>
             </div>
           </div>
 
+          {/* 사무실/숨고 + 브랜드 필터 */}
+          <div style={{padding:"0 16px 8px"}}>
+            {/* 가격 모드 토글 */}
+            <div style={{display:"flex",gap:6,marginBottom:10}}>
+              {[{id:"office",label:"🏢 사무실"},{id:"soomgo",label:"📱 숨고"}].map(m=>(
+                <button key={m.id} onClick={()=>setProdPriceMode(m.id)} style={{
+                  flex:1,padding:"8px",borderRadius:10,border:"1.5px solid",
+                  borderColor:prodPriceMode===m.id?(m.id==="soomgo"?"#16a34a":"#111"):"#eee",
+                  background:prodPriceMode===m.id?(m.id==="soomgo"?"#f0fdf4":"#111"):"#fff",
+                  color:prodPriceMode===m.id?(m.id==="soomgo"?"#16a34a":"#fff"):"#888",
+                  fontFamily:"'Noto Sans KR',sans-serif",fontSize:12,fontWeight:700,cursor:"pointer"
+                }}>{m.label}</button>
+              ))}
+            </div>
+            {/* 브랜드 필터 */}
+            <div style={{display:"flex",gap:7,overflowX:"auto",flexWrap:"nowrap",paddingBottom:4}}>
+              {brands.map(b=>(
+                <button key={b} onClick={()=>setProdBrandFilter(b)} style={{
+                  padding:"6px 14px",borderRadius:20,border:"1.5px solid",whiteSpace:"nowrap",
+                  borderColor:prodBrandFilter===b?"#111":"#eee",
+                  background:prodBrandFilter===b?"#111":"#fff",
+                  color:prodBrandFilter===b?"#fff":"#555",
+                  fontFamily:"'Noto Sans KR',sans-serif",fontSize:12,fontWeight:700,cursor:"pointer"
+                }}>{b}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* 종류 필터 */}
+          <div style={{padding:"0 16px 12px",overflowX:"auto"}}>
+            <div style={{display:"flex",gap:7,flexWrap:"nowrap"}}>
+              {types.map(t=>(
+                <button key={t} onClick={()=>setProdTypeFilter(t)} style={{
+                  padding:"5px 12px",borderRadius:20,border:"1.5px solid",whiteSpace:"nowrap",
+                  borderColor:prodTypeFilter===t?"#2563eb":"#eee",
+                  background:prodTypeFilter===t?"#eff6ff":"#fff",
+                  color:prodTypeFilter===t?"#2563eb":"#888",
+                  fontFamily:"'Noto Sans KR',sans-serif",fontSize:11,fontWeight:700,cursor:"pointer"
+                }}>{t}</button>
+              ))}
+            </div>
+          </div>
+
+          {/* 제품 목록 */}
           <div style={{padding:"0 16px"}}>
-            {/* 기본 제품 목록 (단가표 기반) */}
-            {[...PRODUCTS, ...productList].length === 0
-              ? <div className="empty">자재가 없어요</div>
-              : (() => {
-                const allProds = [...PRODUCTS, ...productList];
-                const types = [...new Set(allProds.map(p=>p.type))];
-                return types.map(type=>(
-                  <div key={type} style={{marginBottom:20}}>
-                    <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:"#aaa",marginBottom:10,textTransform:"uppercase"}}>{type}</div>
-                    {allProds.filter(p=>p.type===type).map(p=>(
-                      <div key={p.id||p.name} style={{
-                        background:"#fff",borderRadius:14,padding:"14px 16px",
-                        marginBottom:8,boxShadow:"0 2px 8px rgba(0,0,0,.05)",
-                        display:"flex",justifyContent:"space-between",alignItems:"center"
-                      }}>
-                        <div>
-                          <div style={{fontSize:14,fontWeight:700,color:"#111"}}>{p.brand} {p.name}</div>
-                          {p.desc&&<div style={{fontSize:12,color:"#aaa",marginTop:2}}>{p.desc}</div>}
-                          <div style={{fontSize:12,color:"#888",marginTop:4}}>
-                            원가 {fmt(p.cost||0)}원 → 소매 {fmt(p.price||0)}원
-                          </div>
-                        </div>
-                        <div style={{textAlign:"right"}}>
-                          <div style={{fontSize:16,fontWeight:900,color:"#111"}}>{fmt(p.price||0)}원</div>
-                          {productList.find(x=>x.id===p.id)&&(
-                            <button style={{
-                              marginTop:6,padding:"4px 10px",borderRadius:8,border:"1px solid #eee",
-                              background:"#fff",fontSize:11,color:"#aaa",cursor:"pointer"
-                            }} onClick={()=>{
-                              setProductList(l=>l.filter(x=>x.id!==p.id));
-                              showToast("🗑 삭제됐어요");
-                            }}>삭제</button>
-                          )}
-                        </div>
+            {filtered.length===0
+              ? <div className="empty">해당 제품이 없어요</div>
+              : filtered.map(p=>{
+                const displayPrice = prodPriceMode==="soomgo" ? soomgoPrice(p.price||0) : (p.price||0);
+                return (
+                  <div key={p.id||p.name}
+                    onClick={()=>setSelectedProd(p)}
+                    style={{
+                      background:"#fff",borderRadius:14,padding:"14px 16px",
+                      marginBottom:8,boxShadow:"0 2px 8px rgba(0,0,0,.05)",
+                      display:"flex",justifyContent:"space-between",alignItems:"center",
+                      cursor:"pointer"
+                    }}>
+                    <div style={{flex:1}}>
+                      <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                        <span style={{fontSize:10,fontWeight:700,padding:"2px 7px",borderRadius:20,background:"#f0f0f0",color:"#888"}}>{p.brand}</span>
+                        <span style={{fontSize:10,color:"#aaa"}}>{p.type}</span>
                       </div>
-                    ))}
+                      <div style={{fontSize:15,fontWeight:900,color:"#111"}}>{p.name}</div>
+                      {p.note&&<div style={{fontSize:11,color:"#aaa",marginTop:2}}>{p.note}</div>}
+                    </div>
+                    <div style={{textAlign:"right"}}>
+                      <div style={{fontSize:16,fontWeight:900,color: prodPriceMode==="soomgo"?"#16a34a":"#111"}}>{fmt(displayPrice)}원</div>
+                      {prodPriceMode==="soomgo"&&<div style={{fontSize:10,color:"#ccc",textDecoration:"line-through"}}>{fmt(p.price||0)}원</div>}
+                    </div>
                   </div>
-                ));
-              })()
+                );
+              })
             }
           </div>
+
+          {/* 제품 상세 팝업 */}
+          {selectedProd&&(
+            <div className="modal-bg" onClick={()=>setSelectedProd(null)}>
+              <div className="modal" style={{maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+                  <div>
+                    <div style={{fontSize:11,color:"#aaa",marginBottom:4}}>{selectedProd.brand} · {selectedProd.type}</div>
+                    <div style={{fontSize:20,fontWeight:900,color:"#111"}}>{selectedProd.name}</div>
+                    {selectedProd.note&&<div style={{fontSize:12,color:"#888",marginTop:4}}>{selectedProd.note}</div>}
+                  </div>
+                  <button style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#aaa"}} onClick={()=>setSelectedProd(null)}>✕</button>
+                </div>
+
+                <div style={{display:"flex",flexDirection:"column",gap:0}}>
+                  <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderBottom:"1px solid #f5f5f5"}}>
+                    <span style={{fontSize:13,color:"#888"}}>원가</span>
+                    <span style={{fontSize:14,fontWeight:700,color:"#111"}}>{fmt(selectedProd.cost||0)}원</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderBottom:"1px solid #f5f5f5"}}>
+                    <span style={{fontSize:13,color:"#888"}}>소매가 (사무실)</span>
+                    <span style={{fontSize:14,fontWeight:700,color:"#111"}}>{fmt(selectedProd.price||0)}원</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderBottom:"1px solid #f5f5f5"}}>
+                    <span style={{fontSize:13,color:"#888"}}>숨고가 (70%)</span>
+                    <span style={{fontSize:14,fontWeight:700,color:"#16a34a"}}>{fmt(soomgoPrice(selectedProd.price||0))}원</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderBottom:"1px solid #f5f5f5"}}>
+                    <span style={{fontSize:13,color:"#888"}}>사무실 차익</span>
+                    <span style={{fontSize:14,fontWeight:700,color:"#2563eb"}}>{fmt((selectedProd.price||0)-(selectedProd.cost||0))}원</span>
+                  </div>
+                  <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0"}}>
+                    <span style={{fontSize:13,color:"#888"}}>숨고 차익</span>
+                    <span style={{fontSize:14,fontWeight:700,color:"#16a34a"}}>{fmt(soomgoPrice(selectedProd.price||0)-(selectedProd.cost||0))}원</span>
+                  </div>
+                </div>
+
+                {productList.find(x=>x.id===selectedProd.id)&&(
+                  <button style={{
+                    width:"100%",marginTop:16,padding:"12px",borderRadius:12,border:"1px solid #fee2e2",
+                    background:"#fff",color:"#dc2626",fontFamily:"'Noto Sans KR',sans-serif",
+                    fontSize:13,fontWeight:700,cursor:"pointer"
+                  }} onClick={()=>{
+                    setProductList(l=>l.filter(x=>x.id!==selectedProd.id));
+                    setSelectedProd(null);
+                    showToast("🗑 삭제됐어요");
+                  }}>🗑 삭제</button>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* 자재 추가 모달 */}
           {showAddProduct&&(
@@ -809,20 +940,20 @@ export default function App() {
               <div className="modal" style={{maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
                 <h3 style={{marginBottom:16}}>📦 자재 추가</h3>
                 {[
-                  {key:"brand",label:"브랜드",placeholder:"예) 락프로"},
-                  {key:"name", label:"제품명", placeholder:"예) H60N"},
-                  {key:"type", label:"종류",   placeholder:"예) 보조키"},
-                  {key:"price",label:"소매가", placeholder:"0"},
-                  {key:"cost", label:"원가",   placeholder:"0"},
-                  {key:"desc", label:"설명",   placeholder:"간단 설명 (선택)"},
+                  {key:"brand",label:"브랜드",    placeholder:"예) 락프로"},
+                  {key:"name", label:"제품명",    placeholder:"예) H60N"},
+                  {key:"type", label:"종류",      placeholder:"예) 보조키"},
+                  {key:"price",label:"소매가",    placeholder:"0", type:"number"},
+                  {key:"cost", label:"원가(비공개)", placeholder:"0", type:"number"},
+                  {key:"note", label:"보안/특이사항", placeholder:"예) 1way, 지문인식 등"},
+                  {key:"desc", label:"메모",      placeholder:"기타 설명"},
                 ].map(f=>(
                   <div key={f.key} style={{marginBottom:14}}>
                     <div style={{fontSize:11,fontWeight:700,color:"#aaa",letterSpacing:2,marginBottom:6}}>{f.label}</div>
                     <input className="input-field" placeholder={f.placeholder}
-                      value={productForm[f.key]}
+                      value={productForm[f.key]||""}
                       onChange={e=>setProductForm(p=>({...p,[f.key]:e.target.value}))}
-                      type={f.key==="price"||f.key==="cost"?"number":"text"}
-                    />
+                      type={f.type||"text"} />
                   </div>
                 ))}
                 <button style={{
@@ -832,13 +963,12 @@ export default function App() {
                 }} onClick={()=>{
                   if(!productForm.name||!productForm.brand) return showToast("브랜드와 제품명을 입력하세요","error");
                   const newP = {
-                    id: "custom_"+Date.now(),
-                    brand: productForm.brand,
-                    name: productForm.name,
-                    type: productForm.type||"기타",
-                    price: Number(productForm.price)||0,
-                    cost: Number(productForm.cost)||0,
-                    desc: productForm.desc,
+                    id:"custom_"+Date.now(),
+                    brand:productForm.brand, name:productForm.name,
+                    type:productForm.type||"기타",
+                    price:Number(productForm.price)||0,
+                    cost:Number(productForm.cost)||0,
+                    note:productForm.note||"", desc:productForm.desc||"",
                   };
                   setProductList(l=>[...l,newP]);
                   setShowAddProduct(false);
@@ -847,7 +977,7 @@ export default function App() {
               </div>
             </div>
           )}
-        </>}
+        </>})()}
 
         {/* ══════════ 대기목록 탭 ══════════ */}
         {tab==="pending" && <>
@@ -1105,18 +1235,48 @@ export default function App() {
                 const displayBase = fq.channel?.id==="soomgo" && item.base>0 ? soomgoPrice(item.base) : item.base;
                 return (
                   <div key={item.id} className="open-detail" style={{marginTop:8}}>
-                    <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:6}}>{item.label}</div>
+                    <div style={{fontSize:12,fontWeight:700,color:"#555",marginBottom:8}}>{item.label}</div>
                     {item.id==="etc" ? (
-                      <div style={{display:"flex",flexDirection:"column",gap:8}}>
-                        <input className="input-field" placeholder="작업 내용 입력 (예: 안전고리 설치)"
-                          value={item.etcDesc||""}
-                          onChange={e=>setFq(f=>({...f,installItems:f.installItems.map(x=>x.id===item.id?{...x,etcDesc:e.target.value}:x)}))} />
-                        <div style={{display:"flex",alignItems:"center",gap:8}}>
-                          <input className="input-field" placeholder="금액" style={{textAlign:"right"}}
-                            value={item.etcPrice?fmtInput(item.etcPrice):""}
-                            onChange={e=>setFq(f=>({...f,installItems:f.installItems.map(x=>x.id===item.id?{...x,etcPrice:parseAmt(e.target.value)}:x)}))} />
-                          <span style={{fontSize:12,color:"#aaa",whiteSpace:"nowrap"}}>원~</span>
+                      <div style={{display:"flex",flexDirection:"column",gap:10}}>
+                        {/* 기타 항목 선택 */}
+                        <div style={{display:"flex",flexWrap:"wrap",gap:7}}>
+                          {ETC_INSTALL_ITEMS.map(e=>{
+                            const sel = (item.etcItems||[]).find(x=>x.id===e.id);
+                            return (
+                              <button key={e.id} style={{
+                                padding:"7px 12px",borderRadius:10,border:"1.5px solid",
+                                borderColor:sel?"#111":"#eee",
+                                background:sel?"#111":"#fff",
+                                color:sel?"#fff":"#555",
+                                fontFamily:"'Noto Sans KR',sans-serif",fontSize:12,fontWeight:600,cursor:"pointer"
+                              }} onClick={()=>{
+                                const cur = item.etcItems||[];
+                                const next = cur.find(x=>x.id===e.id) ? cur.filter(x=>x.id!==e.id) : [...cur,{...e}];
+                                setFq(f=>({...f,installItems:f.installItems.map(x=>x.id==="etc"?{...x,etcItems:next}:x)}));
+                              }}>{e.label}{e.price>0?` ${fmt(e.price)}원`:""}</button>
+                            );
+                          })}
                         </div>
+                        {/* 직접 입력 */}
+                        {(item.etcItems||[]).find(x=>x.id==="custom")&&(
+                          <div style={{display:"flex",flexDirection:"column",gap:6,marginTop:4}}>
+                            <input className="input-field" placeholder="작업 내용 직접 입력"
+                              value={item.customDesc||""}
+                              onChange={e=>setFq(f=>({...f,installItems:f.installItems.map(x=>x.id==="etc"?{...x,customDesc:e.target.value}:x)}))} />
+                            <div style={{display:"flex",alignItems:"center",gap:8}}>
+                              <input className="input-field" placeholder="금액" type="number"
+                                value={item.customPrice||""}
+                                onChange={e=>setFq(f=>({...f,installItems:f.installItems.map(x=>x.id==="etc"?{...x,customPrice:Number(e.target.value)}:x)}))} />
+                              <span style={{fontSize:12,color:"#aaa",whiteSpace:"nowrap"}}>원~</span>
+                            </div>
+                          </div>
+                        )}
+                        {/* 선택된 항목 합계 */}
+                        {(item.etcItems||[]).filter(x=>x.id!=="custom").length>0&&(
+                          <div style={{fontSize:12,color:"#888",fontWeight:600}}>
+                            합계: {fmt((item.etcItems||[]).filter(x=>x.id!=="custom").reduce((a,x)=>a+x.price,0)+(item.customPrice||0))}원~
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="qty-row">
@@ -1141,6 +1301,31 @@ export default function App() {
               <div className="ptitle">문의 내용</div>
               <textarea className="memo-input" placeholder="고객 문의 내용을 입력하세요"
                 value={fq.memo} onChange={e=>setFq(f=>({...f,memo:e.target.value}))} />
+            </div>
+          )}
+
+          {/* 출장비 / 할증 */}
+          {fq.workType&&(
+            <div className="panel">
+              <div className="ptitle">출장비 / 할증</div>
+              <div className="sel-col">
+                <button style={{
+                  display:"flex",justifyContent:"space-between",alignItems:"center",
+                  padding:"11px 14px",borderRadius:12,border:"1.5px solid",cursor:"pointer",width:"100%",
+                  borderColor:fq.noTravel?"#e74c3c":"#eee",
+                  background:fq.noTravel?"#fef2f2":"#fff",
+                  fontFamily:"'Noto Sans KR',sans-serif",
+                }} onClick={()=>setFq(f=>({...f,noTravel:!f.noTravel}))}>
+                  <span style={{fontSize:13,fontWeight:700,color:fq.noTravel?"#e74c3c":"#555"}}>출장비 제외</span>
+                  <span style={{fontSize:12,color:fq.noTravel?"#e74c3c":"#aaa"}}>{fq.noTravel?"✓ 제외됨":`기본 ${fmt(isSoomgo?TRAVEL_FEE_SOOMGO:TRAVEL_FEE)}원`}</span>
+                </button>
+                {SURCHARGES.map(s=>(
+                  <button key={s.id} className={`sel-btn ${fq.surcharges.find(x=>x.id===s.id)?"on":""}`}
+                    onClick={()=>setFq(f=>{const e=f.surcharges.find(x=>x.id===s.id);return{...f,surcharges:e?f.surcharges.filter(x=>x.id!==s.id):[...f.surcharges,s]};})}>
+                    <span>{s.label}</span><span className="sub">+{fmt(s.amount)}원</span>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
@@ -1228,8 +1413,8 @@ export default function App() {
                 </div>
 
                 {/* 안내 */}
-                <div style={{marginTop:14,background:"#fffbf0",border:"1px solid #f5e4b0",borderRadius:11,padding:"12px 14px",fontSize:12,color:"#997700",lineHeight:1.7}}>
-                  📌 현장 상황(난이도, 추가 부품 등)에 따라 금액이 변동될 수 있으며, 변동 시 작업 전 반드시 사전에 안내드립니다.
+                <div style={{marginTop:14,background:"#fffbf0",border:"1px solid #f5e4b0",borderRadius:11,padding:"12px 14px",fontSize:12,color:"#997700",lineHeight:1.8}}>
+                  📌 위 금액은 현장 방문 전 예상 금액입니다. 문/잠금장치 상태, 작업환경 등 현장 변수에 따라 금액이 달라질 수 있으며 변동 시 작업 전 먼저 안내드립니다. 😊
                 </div>
 
                 {fq.memo&&<div style={{marginTop:12,background:"#f8f8f8",borderRadius:11,padding:"12px 14px",fontSize:12,color:"#666",lineHeight:1.7}}>💬 {fq.memo}</div>}
@@ -1289,7 +1474,7 @@ export default function App() {
                 <div style={{display:"flex",flexDirection:"column"}}>
                   <div style={{display:"flex",justifyContent:"space-between",padding:"9px 0",borderBottom:"1px solid #f5f5f5"}}>
                     <span style={{fontSize:13,color:"#555"}}>출장비</span>
-                    <span style={{fontSize:13,fontWeight:700}}>30,000원</span>
+                    <span style={{fontSize:13,fontWeight:700}}>{fmt(Number(viewRecord.출장비||TRAVEL_FEE))}원</span>
                   </div>
                   {viewRecord.개문내역&&Number(viewRecord.개문금액||0)>0&&(
                     <div style={{display:"flex",justifyContent:"space-between",padding:"9px 0",borderBottom:"1px solid #f5f5f5"}}>
@@ -1307,6 +1492,13 @@ export default function App() {
                     <div style={{display:"flex",justifyContent:"space-between",padding:"9px 0",borderBottom:"1px solid #f5f5f5"}}>
                       <span style={{fontSize:13,fontWeight:700,color:"#111"}}>{viewRecord.기타항목}</span>
                       <span style={{fontSize:13,fontWeight:700}}>{fmt(Number(viewRecord.기타금액))}원</span>
+                    </div>
+                  )}
+                  {/* 자재 원가 내역 */}
+                  {viewRecord.자재원가>0&&(
+                    <div style={{background:"#f8f8f8",borderRadius:10,padding:"10px 12px",margin:"6px 0"}}>
+                      <div style={{fontSize:11,color:"#aaa",fontWeight:700,letterSpacing:1,marginBottom:4}}>자재 원가</div>
+                      <div style={{fontSize:12,color:"#666"}}>{viewRecord.자재내역||`${fmt(viewRecord.자재원가)}원`}</div>
                     </div>
                   )}
                   {viewRecord.보강자재&&Number(viewRecord.보강금액||0)>0&&(
@@ -1451,12 +1643,15 @@ export default function App() {
                   </div>
                   {viewRecord.채널==="office"&&(
                     <div style={{display:"flex",justifyContent:"space-between",padding:"7px 0",borderBottom:"1px solid #2a2a3e"}}>
-                      <span style={{fontSize:12,color:"#888"}}>사무실 배분 (50%)</span>
-                      <span style={{fontSize:13,fontWeight:700,color:"#aaa"}}>- {fmt(Math.round((Number(viewRecord.총금액||0)-Number(viewRecord.자재원가||0))*0.5))}원</span>
+                      <div>
+                        <div style={{fontSize:12,color:"#888"}}>사무실 입금액</div>
+                        <div style={{fontSize:10,color:"#555",marginTop:2}}>순이익 50% + 자재원가 {fmt(Number(viewRecord.자재원가||0))}원</div>
+                      </div>
+                      <span style={{fontSize:13,fontWeight:700,color:"#e74c3c"}}>- {fmt(Math.round((Number(viewRecord.총금액||0)-Number(viewRecord.자재원가||0))*0.5)+Number(viewRecord.자재원가||0))}원</span>
                     </div>
                   )}
                   <div style={{display:"flex",justifyContent:"space-between",paddingTop:12}}>
-                    <span style={{fontSize:13,fontWeight:700,color:"#ccc"}}>준형</span>
+                    <span style={{fontSize:13,fontWeight:700,color:"#ccc"}}>준형 수령</span>
                     <span style={{fontSize:22,fontWeight:900,color:"#4ade80"}}>{fmt(Number(viewRecord.준형수령액||0))}원</span>
                   </div>
                 </div>
@@ -1484,9 +1679,14 @@ export default function App() {
               </div>
               <div style={{marginBottom:20}}>
                 <div style={{fontSize:11,fontWeight:700,color:"#aaa",letterSpacing:2,marginBottom:8}}>방문 시간</div>
-                <input type="time" className="input-field"
+                <input className="input-field" placeholder="예) 10:00"
                   value={reserveForm.time}
-                  onChange={e=>setReserveForm(f=>({...f,time:e.target.value}))} />
+                  maxLength={5}
+                  onChange={e=>{
+                    let v=e.target.value.replace(/[^0-9]/g,"");
+                    if(v.length>=3) v=v.slice(0,2)+":"+v.slice(2,4);
+                    setReserveForm(f=>({...f,time:v}));
+                  }} />
               </div>
               {reserveForm.date&&(
                 <div style={{background:"#f5f3ff",border:"1px solid #ddd6fe",borderRadius:10,padding:"12px 14px",marginBottom:16,fontSize:13,color:"#7c3aed",fontWeight:700}}>
@@ -1545,10 +1745,11 @@ export default function App() {
                 </div>
                 <div className="cancel-opts">
                   {[
-                    {label:"고객 변심",   travel:true },
-                    {label:"연락 두절",   travel:true },
-                    {label:"출동 중 취소",travel:true },
-                    {label:"기타",        travel:true },
+                    {label:"고객 변심",           travel:true },
+                    {label:"연락 두절",           travel:true },
+                    {label:"출동 중 취소",         travel:true },
+                    {label:"기타 (출장비 O)",      travel:true },
+                    {label:"기타 (출장비 X)",      travel:false},
                     {label:"작업 불가 (기술 부족)", travel:false},
                   ].map(r=>{
                     const hasTravelFee = r.travel;
@@ -1577,143 +1778,129 @@ export default function App() {
           </div>
         )}
 
-        {showAddRecord&&(
+        {showAddRecord&&(()=>{
+          const af = addForm;
+          const isSoomgo = af.channel==="soomgo";
+          const needOpen = af.workType==="개문"||af.workType==="개문+설치";
+          const needInstall = af.workType==="단순설치"||af.workType==="개문+설치";
+          const travelFee = af.noTravel ? 0 : (isSoomgo ? TRAVEL_FEE_SOOMGO : TRAVEL_FEE);
+          const openTotal = (af.openItems||[]).reduce((a,i)=>a+(isSoomgo?soomgoOpen(i.actual):i.actual)*i.qty,0);
+          const prodTotal = (af.products||[]).reduce((a,p)=>a+(isSoomgo?soomgoPrice(p.price):p.price)*(p.qty||1),0);
+          const subTotal  = travelFee+(needOpen?openTotal:0)+(needInstall?prodTotal:0);
+          const costTotal = (af.products||[]).reduce((a,p)=>a+p.cost*(p.qty||1),0);
+          const myE       = isSoomgo ? subTotal-costTotal : Math.round((subTotal-costTotal)*0.5);
+          const filteredP = (af.productFilter||"전체")==="전체" ? PRODUCTS : PRODUCTS.filter(p=>p.type===af.productFilter);
+          const fmtTime = v => { const d=v.replace(/\D/g,"").slice(0,4); return d.length>=3?d.slice(0,2)+":"+d.slice(2):d; };
+
+          return (
           <div className="modal-bg" onClick={()=>setShowAddRecord(false)}>
-            <div className="modal" style={{maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-              <h3 style={{marginBottom:16}}>📝 작업 추가 — {selectedDate}</h3>
+            <div style={{position:"fixed",top:"3%",left:"50%",transform:"translateX(-50%)",width:"93%",maxWidth:480,maxHeight:"92vh",overflowY:"auto",background:"#f5f5f7",borderRadius:20,zIndex:400}} onClick={e=>e.stopPropagation()}>
 
-              {/* 채널 */}
-              <div style={{fontSize:11,fontWeight:700,color:"#aaa",letterSpacing:2,marginBottom:8}}>채널</div>
-              <div style={{display:"flex",gap:8,marginBottom:16}}>
-                {["office","soomgo"].map(ch=>(
-                  <button key={ch} style={{
-                    flex:1,padding:"10px",borderRadius:10,border:"1.5px solid",
-                    borderColor:addForm.channel===ch?"#111":"#eee",
-                    background:addForm.channel===ch?"#111":"#fff",
-                    color:addForm.channel===ch?"#fff":"#555",
-                    fontFamily:"'Noto Sans KR',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer"
-                  }} onClick={()=>setAddForm(f=>({...f,channel:ch}))}>
-                    {ch==="office"?"🏢 사무실":"📱 숨고"}
+              <div style={{background:"#111",padding:"16px 20px 14px",borderRadius:"20px 20px 0 0",position:"sticky",top:0,zIndex:10}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div>
+                    <div style={{fontSize:10,color:"rgba(255,255,255,.5)",fontWeight:700,letterSpacing:2,marginBottom:4}}>작업 추가 · {selectedDate}</div>
+                    <div style={{fontSize:16,fontWeight:900,color:"#fff"}}>직접 기록</div>
+                  </div>
+                  <button style={{background:"rgba(255,255,255,.15)",border:"none",color:"#fff",borderRadius:20,padding:"6px 14px",fontFamily:"'Noto Sans KR',sans-serif",fontSize:12,fontWeight:700,cursor:"pointer"}} onClick={()=>setShowAddRecord(false)}>✕ 닫기</button>
+                </div>
+              </div>
+
+              <div className="panel" style={{marginTop:10}}>
+                <div className="ptitle">채널</div>
+                <div style={{display:"flex",gap:8}}>
+                  {[{id:"office",label:"🏢 사무실"},{id:"soomgo",label:"📱 숨고"}].map(ch=>(
+                    <button key={ch.id} style={{flex:1,padding:"11px",borderRadius:12,border:"1.5px solid",borderColor:af.channel===ch.id?(ch.id==="soomgo"?"#16a34a":"#111"):"#eee",background:af.channel===ch.id?(ch.id==="soomgo"?"#f0fdf4":"#111"):"#fff",color:af.channel===ch.id?(ch.id==="soomgo"?"#16a34a":"#fff"):"#aaa",fontFamily:"'Noto Sans KR',sans-serif",fontWeight:700,fontSize:13,cursor:"pointer"}} onClick={()=>setAddForm(f=>({...f,channel:ch.id}))}>{ch.label}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="panel">
+                <div className="ptitle">상태</div>
+                <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+                  {["완료","견적대기","출동중","예약","취소"].map(s=>{const sc=STATUS_CONFIG[s]||STATUS_CONFIG["견적대기"];return <button key={s} style={{padding:"7px 12px",borderRadius:20,border:"1.5px solid",borderColor:af.status===s?sc.color:"#eee",background:af.status===s?sc.bg:"#fff",color:af.status===s?sc.color:"#aaa",fontFamily:"'Noto Sans KR',sans-serif",fontWeight:700,fontSize:12,cursor:"pointer"}} onClick={()=>setAddForm(f=>({...f,status:s}))}>{sc.emoji} {s}</button>;})}
+                </div>
+              </div>
+
+              <div className="panel">
+                <div className="ptitle">작업 유형</div>
+                <div style={{display:"flex",gap:8,marginBottom:needOpen||needInstall?14:0}}>
+                  {WORK_TYPES.map(w=>(<button key={w.id} style={{flex:1,padding:"10px",borderRadius:12,border:"1.5px solid",borderColor:af.workType===w.label?"#111":"#eee",background:af.workType===w.label?"#111":"#fff",color:af.workType===w.label?"#fff":"#555",fontFamily:"'Noto Sans KR',sans-serif",fontWeight:700,fontSize:12,cursor:"pointer"}} onClick={()=>setAddForm(f=>({...f,workType:w.label,openItems:[],products:[]}))}>{w.label}</button>))}
+                </div>
+                {needOpen&&<div style={{marginTop:8}}>
+                  <div style={{fontSize:11,color:"#aaa",fontWeight:700,letterSpacing:2,marginBottom:8}}>개문 유형 (중복 선택)</div>
+                  {OPEN_TYPES.map(t=>{const sel=(af.openItems||[]).find(x=>x.id===t.id);const price=isSoomgo?soomgoOpen(t.actual):t.actual;return(<div key={t.id}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",borderRadius:10,marginBottom:6,cursor:"pointer",border:"1.5px solid",borderColor:sel?"#111":"#eee",background:sel?"#111":"#fff"}} onClick={()=>setAddForm(f=>{const cur=f.openItems||[];return{...f,openItems:cur.find(x=>x.id===t.id)?cur.filter(x=>x.id!==t.id):[...cur,{...t,qty:1}]};})}><span style={{fontSize:13,fontWeight:700,color:sel?"#fff":"#111"}}>{t.label}</span><span style={{fontSize:12,color:sel?"rgba(255,255,255,.6)":"#aaa"}}>{fmt(price)}원~</span></div>{sel&&<div className="qty-row" style={{marginBottom:8,paddingLeft:4}}><label style={{fontSize:12,color:"#888"}}>수량</label><div className="qty-ctrl"><button className="qty-btn" onClick={()=>setAddForm(f=>({...f,openItems:f.openItems.map(x=>x.id===t.id?{...x,qty:Math.max(1,x.qty-1)}:x)}))}>−</button><div className="qty-num">{sel.qty}</div><button className="qty-btn" onClick={()=>setAddForm(f=>({...f,openItems:f.openItems.map(x=>x.id===t.id?{...x,qty:x.qty+1}:x)}))}>＋</button></div><span style={{fontSize:12,color:"#aaa"}}>{fmt(price*sel.qty)}원</span></div>}</div>);})}</div>}
+                {needInstall&&<div style={{marginTop:needOpen?14:0}}>
+                  <div style={{fontSize:11,color:"#aaa",fontWeight:700,letterSpacing:2,marginBottom:8}}>제품 선택 (중복 가능)</div>
+                  <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>{["전체","보조키","주키","푸쉬풀","강화유리","기타"].map(t=>(<button key={t} style={{padding:"5px 12px",borderRadius:20,border:"1.5px solid",borderColor:(af.productFilter||"전체")===t?"#2563eb":"#eee",background:(af.productFilter||"전체")===t?"#eff6ff":"#fff",color:(af.productFilter||"전체")===t?"#2563eb":"#888",fontFamily:"'Noto Sans KR',sans-serif",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={()=>setAddForm(f=>({...f,productFilter:t}))}>{t}</button>))}</div>
+                  <div style={{maxHeight:180,overflowY:"auto",display:"flex",flexDirection:"column",gap:6}}>{filteredP.map(p=>{const price=isSoomgo?soomgoPrice(p.price):p.price;const sel=(af.products||[]).find(x=>x.id===p.id);return(<div key={p.id}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",borderRadius:10,cursor:"pointer",border:"1.5px solid",borderColor:sel?"#111":"#eee",background:sel?"#111":"#fff"}} onClick={()=>setAddForm(f=>{const cur=f.products||[];return{...f,products:cur.find(x=>x.id===p.id)?cur.filter(x=>x.id!==p.id):[...cur,{...p,qty:1}]};})}><div><div style={{fontSize:13,fontWeight:700,color:sel?"#fff":"#111"}}>{p.brand} {p.name}</div><div style={{fontSize:11,color:sel?"rgba(255,255,255,.5)":"#aaa"}}>{p.type}</div></div><span style={{fontSize:13,fontWeight:700,color:sel?"#fff":"#111"}}>{fmt(price)}원</span></div>{sel&&<div className="qty-row" style={{marginTop:4,marginBottom:4,paddingLeft:4}}><label style={{fontSize:12,color:"#888"}}>수량</label><div className="qty-ctrl"><button className="qty-btn" onClick={()=>setAddForm(f=>({...f,products:f.products.map(x=>x.id===p.id?{...x,qty:Math.max(1,(x.qty||1)-1)}:x)}))}>−</button><div className="qty-num">{sel.qty||1}</div><button className="qty-btn" onClick={()=>setAddForm(f=>({...f,products:f.products.map(x=>x.id===p.id?{...x,qty:(x.qty||1)+1}:x)}))}>＋</button></div><span style={{fontSize:12,color:"#aaa"}}>{fmt(price*(sel.qty||1))}원</span><button style={{marginLeft:"auto",background:"#fee2e2",border:"none",borderRadius:20,padding:"3px 10px",fontSize:11,color:"#dc2626",fontWeight:700,cursor:"pointer"}} onClick={()=>setAddForm(f=>({...f,products:f.products.filter(x=>x.id!==p.id)}))}>✕</button></div>}</div>);})}</div>
+                </div>}
+              </div>
+
+              <div className="panel">
+                <div className="ptitle">고객 정보</div>
+                <div style={{display:"flex",flexDirection:"column",gap:8}}>
+                  {/* 출장비 토글 */}
+                  <button style={{
+                    display:"flex",justifyContent:"space-between",alignItems:"center",
+                    padding:"11px 14px",borderRadius:12,border:"1.5px solid",cursor:"pointer",
+                    borderColor:af.noTravel?"#e74c3c":"#eee",
+                    background:af.noTravel?"#fef2f2":"#fff",
+                    fontFamily:"'Noto Sans KR',sans-serif",
+                  }} onClick={()=>setAddForm(f=>({...f,noTravel:!f.noTravel}))}>
+                    <span style={{fontSize:13,fontWeight:700,color:af.noTravel?"#e74c3c":"#555"}}>출장비 제외</span>
+                    <span style={{fontSize:12,color:af.noTravel?"#e74c3c":"#aaa"}}>{af.noTravel?"✓ 제외됨":`기본 ${fmt(isSoomgo?TRAVEL_FEE_SOOMGO:TRAVEL_FEE)}원`}</span>
                   </button>
-                ))}
+                  <input className="input-field" placeholder="시간 (예: 1430 → 14:30)" value={af.time} onChange={e=>setAddForm(f=>({...f,time:fmtTime(e.target.value)}))} />
+                  <input className="input-field" placeholder="연락처 (01012345678 → 자동 - 삽입)" value={af.phone||""} onChange={e=>setAddForm(f=>({...f,phone:formatPhone(e.target.value)}))} />
+                  <input className="input-field" placeholder="주소" value={af.address||""} onChange={e=>setAddForm(f=>({...f,address:e.target.value}))} />
+                </div>
               </div>
 
-              {/* 상태 */}
-              <div style={{fontSize:11,fontWeight:700,color:"#aaa",letterSpacing:2,marginBottom:8}}>상태</div>
-              <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
-                {["완료","견적대기","출동중","취소"].map(s=>(
-                  <button key={s} style={{
-                    padding:"7px 12px",borderRadius:20,border:"1.5px solid",
-                    borderColor:addForm.status===s?"#111":"#eee",
-                    background:addForm.status===s?"#111":"#fff",
-                    color:addForm.status===s?"#fff":"#555",
-                    fontFamily:"'Noto Sans KR',sans-serif",fontWeight:700,fontSize:12,cursor:"pointer"
-                  }} onClick={()=>setAddForm(f=>({...f,status:s}))}>{s}</button>
-                ))}
-              </div>
+              {af.workType&&<div className="panel">
+                <div className="ptitle">금액 정산 (자동)</div>
+                <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"#888"}}><span>출장비</span><span style={{fontWeight:700}}>{fmt(travelFee)}원</span></div>
+                  {needOpen&&(af.openItems||[]).map(i=>(<div key={i.id} style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"#888"}}><span>{i.label}{i.qty>1?` ×${i.qty}`:""}</span><span style={{fontWeight:700}}>{fmt((isSoomgo?soomgoOpen(i.actual):i.actual)*i.qty)}원</span></div>))}
+                  {needInstall&&(af.products||[]).map(p=>(<div key={p.id} style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"#888"}}><span>{p.brand} {p.name}{(p.qty||1)>1?` ×${p.qty||1}`:""}</span><span style={{fontWeight:700}}>{fmt((isSoomgo?soomgoPrice(p.price):p.price)*(p.qty||1))}원</span></div>))}
+                  <div style={{height:1,background:"#eee",margin:"4px 0"}}/>
+                  <div style={{display:"flex",justifyContent:"space-between",fontSize:15,fontWeight:900,color:"#111"}}><span>합계</span><span>{fmt(subTotal)}원</span></div>
+                </div>
+                <div style={{background:"#f0fdf4",borderRadius:12,padding:"12px 14px",display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                  <div><div style={{fontSize:12,color:"#16a34a",fontWeight:700}}>준형 수령 예상</div><div style={{fontSize:11,color:"#aaa",marginTop:2}}>{isSoomgo?"숨고 100%":"사무실 50%"}</div></div>
+                  <div style={{fontSize:20,fontWeight:900,color:"#16a34a"}}>{fmt(myE)}원</div>
+                </div>
+                <textarea className="memo-input" placeholder="현장 메모" value={af.note||""} onChange={e=>setAddForm(f=>({...f,note:e.target.value}))} />
+              </div>}
 
-              {/* 시간 */}
-              <div style={{fontSize:11,fontWeight:700,color:"#aaa",letterSpacing:2,marginBottom:8}}>시간</div>
-              <input type="time" style={{width:"100%",border:"1.5px solid #eee",borderRadius:10,padding:"10px 12px",fontFamily:"'Noto Sans KR',sans-serif",fontSize:14,marginBottom:16,outline:"none"}}
-                value={addForm.time} onChange={e=>setAddForm(f=>({...f,time:e.target.value}))} />
-
-              {/* 작업유형 */}
-              <div style={{fontSize:11,fontWeight:700,color:"#aaa",letterSpacing:2,marginBottom:8}}>작업 유형</div>
-              <div style={{display:"flex",gap:6,marginBottom:16,flexWrap:"wrap"}}>
-                {["개문만","설치만","개문 + 설치"].map(w=>(
-                  <button key={w} style={{
-                    padding:"7px 12px",borderRadius:20,border:"1.5px solid",
-                    borderColor:addForm.workType===w?"#111":"#eee",
-                    background:addForm.workType===w?"#111":"#fff",
-                    color:addForm.workType===w?"#fff":"#555",
-                    fontFamily:"'Noto Sans KR',sans-serif",fontWeight:700,fontSize:12,cursor:"pointer"
-                  }} onClick={()=>setAddForm(f=>({...f,workType:w}))}>{w}</button>
-                ))}
-              </div>
-
-              {/* 개문유형 */}
-              <div style={{fontSize:11,fontWeight:700,color:"#aaa",letterSpacing:2,marginBottom:8}}>개문 유형</div>
-              <input className="input-field" placeholder="예) 도어락 주키" style={{marginBottom:16}}
-                value={addForm.openType} onChange={e=>setAddForm(f=>({...f,openType:e.target.value}))} />
-
-              {/* 제품명 */}
-              <div style={{fontSize:11,fontWeight:700,color:"#aaa",letterSpacing:2,marginBottom:8}}>제품명</div>
-              <input className="input-field" placeholder="예) 락프로 H2000s" style={{marginBottom:16}}
-                value={addForm.product} onChange={e=>setAddForm(f=>({...f,product:e.target.value}))} />
-
-              {/* 주소 */}
-              <div style={{fontSize:11,fontWeight:700,color:"#aaa",letterSpacing:2,marginBottom:8}}>주소</div>
-              <input className="input-field" placeholder="예) 강남구 테헤란로 123" style={{marginBottom:16}}
-                value={addForm.address||""} onChange={e=>setAddForm(f=>({...f,address:e.target.value}))} />
-
-              {/* 총금액 */}
-              <div style={{fontSize:11,fontWeight:700,color:"#aaa",letterSpacing:2,marginBottom:8}}>총 청구액</div>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
-                <input className="input-field" placeholder="0"
-                  value={fmtInput(addForm.total)}
-                  onChange={e=>setAddForm(f=>({...f,total:parseAmt(e.target.value)}))}
-                  style={{textAlign:"right"}} />
-                <span style={{fontSize:13,color:"#aaa"}}>원</span>
-              </div>
-
-              {/* 준형 수령액 */}
-              <div style={{fontSize:11,fontWeight:700,color:"#aaa",letterSpacing:2,marginBottom:8}}>준형 수령액</div>
-              <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:16}}>
-                <input className="input-field" placeholder="0"
-                  value={fmtInput(addForm.myEarnings)}
-                  onChange={e=>setAddForm(f=>({...f,myEarnings:parseAmt(e.target.value)}))}
-                  style={{textAlign:"right"}} />
-                <span style={{fontSize:13,color:"#aaa"}}>원</span>
-              </div>
-
-              {/* 메모 */}
-              <div style={{fontSize:11,fontWeight:700,color:"#aaa",letterSpacing:2,marginBottom:8}}>메모</div>
-              <textarea className="memo-input" placeholder="작업 내용 메모" style={{marginBottom:20}}
-                value={addForm.note} onChange={e=>setAddForm(f=>({...f,note:e.target.value}))} />
-
-              {/* 저장 */}
-              <button style={{
-                width:"100%",padding:"14px",borderRadius:12,border:"none",
-                background:"#111",color:"#fff",fontFamily:"'Noto Sans KR',sans-serif",
-                fontSize:15,fontWeight:700,cursor:"pointer"
-              }} onClick={async()=>{
-                try {
-                  const record = {
-                    date: selectedDate,
-                    time: addForm.time || "00:00",
-                    channel: addForm.channel,
-                    status: addForm.status,
-                    address: addForm.address||"",
-                    workType: addForm.workType,
-                    openType: addForm.openType,
-                    product: addForm.product,
-                    total: addForm.total||0,
-                    myEarnings: addForm.myEarnings||0,
-                    discount:0, materialCost:0,
-                    note: addForm.note,
-                    cancelReason:"",
-                  };
-                  const result = await api.save(record);
-                  const saved = {
-                    ...record, ID:result.id||Date.now().toString(),
-                    날짜:record.date, 시간:record.time,
-                    채널:record.channel, 상태:record.status,
-                    주소:record.address, 작업유형:record.workType,
-                    개문유형:record.openType, 제품명:record.product,
-                    총금액:record.total, 준형수령액:record.myEarnings,
-                    현장메모:record.note,
+              <div style={{padding:"4px 12px 24px"}}>
+                <button style={{width:"100%",padding:"15px",borderRadius:14,border:"none",background:"#111",color:"#fff",fontFamily:"'Noto Sans KR',sans-serif",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>{
+                  const id=Date.now().toString();
+                  const openLabel=(af.openItems||[]).map(i=>`${i.label}${i.qty>1?` ×${i.qty}`:""}`).join(", ");
+                  const prodLabel=(af.products||[]).map(p=>`${p.brand} ${p.name}${(p.qty||1)>1?` ×${p.qty||1}`:""}`).join(", ");
+                  const saved={
+                    ID:id, 날짜:selectedDate, 시간:af.time||nowTime(),
+                    채널:af.channel, 상태:af.status,
+                    연락처:af.phone||"", 주소:af.address||"",
+                    작업유형:af.workType,
+                    개문유형:openLabel, 개문금액:needOpen?openTotal:0,
+                    제품명:prodLabel, 설치금액:needInstall?prodTotal:0,
+                    총금액:subTotal, 준형수령액:myE,
+                    자재원가:costTotal,
+                    자재내역:(af.products||[]).map(p=>`${p.brand} ${p.name}${(p.qty||1)>1?` ×${p.qty||1}`:""} (원가 ${fmt(p.cost*(p.qty||1))}원)`).join(", "),
+                    현장메모:af.note||"",
                   };
                   setLocalRecords(p=>[...p,saved]);
-                  if(SCRIPT_URL!=="여기에_URL_붙여넣기") loadRecords();
+                  if(SCRIPT_URL!=="여기에_URL_붙여넣기") api.save({date:selectedDate,time:saved.시간,channel:af.channel,status:af.status,phone:af.phone,address:af.address,workType:af.workType,openType:openLabel,product:prodLabel,total:subTotal,myEarnings:myE,materialCost:costTotal,note:af.note}).then(()=>loadRecords()).catch(()=>{});
+                  setAddForm({channel:"office",time:"",workType:"",status:"완료",phone:"",address:"",note:"",openItems:[],products:[],productFilter:"전체",noTravel:false});
                   setShowAddRecord(false);
                   showToast("✅ 저장됐어요!");
-                } catch(e) {
-                  showToast("❌ 저장 실패: "+e.message, "error");
-                }
-              }}>저장</button>
+                }}>✅ 저장</button>
+              </div>
             </div>
           </div>
-        )}
+          );
+        })()}
 
         {/* Toast */}
         {toast && (
@@ -1763,7 +1950,7 @@ export default function App() {
 // ════════════════════════════════════════════════
 // 최종 견적서 컴포넌트
 // ════════════════════════════════════════════════
-function FinalQuoteView({ fnq, setFnq, onSave, onBack, showToast }) {
+function FinalQuoteView({ fnq, setFnq, onSave, onBack, showToast, isManual, selectedDate }) {
   const f = fnq;
   const set = (key, val) => setFnq(p=>({...p,[key]:val}));
 
@@ -1810,7 +1997,7 @@ function FinalQuoteView({ fnq, setFnq, onSave, onBack, showToast }) {
         {/* 견적 카드 */}
         <div className="quote-card">
           <div className="qcard-head">
-            <div className="qcard-badge">최종 견적서 · FINAL</div>
+            <div className="qcard-badge">{isManual ? `작업 추가 · ${selectedDate}` : "최종 견적서 · FINAL"}</div>
             <div className="qcard-title">도어락 · 열쇠 전문 출장</div>
             {f.phone&&<div className="qcard-info">{f.phone}</div>}
             {f.address&&<div className="qcard-info">📍 {f.address}</div>}
@@ -1849,10 +2036,10 @@ function FinalQuoteView({ fnq, setFnq, onSave, onBack, showToast }) {
         <div className="profit-box" style={{marginTop:14}}>
           <div className="profit-title">📊 사무실 정산 (비공개)</div>
           <div className="profit-row"><span className="profit-label">총 청구액</span><span className="profit-val">{fmt(finalTotal)}원</span></div>
-          {(f.products||[]).map(p=><div key={p.id} className="profit-row"><span className="profit-label">{p.type} · {p.brand} {p.name}</span><span className="profit-val">- {fmt(p.cost)}원</span></div>)}
+          {(f.products||[]).map(p=><div key={p.id} className="profit-row"><span className="profit-label">{p.type} · {p.brand} {p.name}</span><span className="profit-val">- {fmt(p.cost*(p.qty||1))}원</span></div>)}
           {f.reinforcements.map(r=><div key={r.id} className="profit-row"><span className="profit-label">보강판 · {r.label}</span><span className="profit-val">- {fmt(r.cost)}원</span></div>)}
           <div className="profit-row"><span className="profit-label">순이익</span><span className="profit-val">{fmt(finalTotal-totalCost)}원</span></div>
-          {f.channel?.id==="office"&&<div className="profit-row"><span className="profit-label">사무실 배분 (50%)</span><span className="profit-val">- {fmt(Math.round((finalTotal-totalCost)*0.5))}원</span></div>}
+          {f.channel?.id==="office"&&<div className="profit-row"><span className="profit-label">사무실 입금 (50% + 자재 {fmt(totalCost)}원)</span><span className="profit-val">- {fmt(Math.round((finalTotal-totalCost)*0.5)+totalCost)}원</span></div>}
           <div className="profit-row main"><span className="profit-label">준형</span><span className="profit-val">{fmt(myEarnings)}원</span></div>
         </div>
 
@@ -1860,6 +2047,7 @@ function FinalQuoteView({ fnq, setFnq, onSave, onBack, showToast }) {
           <button className="act" onClick={()=>set("step","form")}>← 수정</button>
           <button className="act primary" onClick={()=>{
             const breakdown = {
+              출장비: fnqTravelFee,
               개문내역: needOpen ? f.openItems.map(i=>`${i.label} 개문${i.qty>1?` ×${i.qty}`:""}`).join(", ") : "",
               개문금액: needOpen ? openTotal : 0,
               설치제품: needInstall ? (f.products||[]).map(p=>`${p.brand} ${p.name}`).join(", ") : "",
@@ -1885,8 +2073,17 @@ function FinalQuoteView({ fnq, setFnq, onSave, onBack, showToast }) {
   return (
     <>
       <div className="page-top">
-        <div className="page-title">최종 견적서</div>
-        {f.recordId&&<div style={{fontSize:11,background:"#f0fdf4",color:"#16a34a",padding:"4px 10px",borderRadius:20,fontWeight:700}}>연동됨</div>}
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%"}}>
+          <div className="page-title">{isManual ? "작업 추가" : "최종 견적서"}</div>
+          <div style={{display:"flex",gap:8,alignItems:"center"}}>
+            {!isManual && f.recordId&&<div style={{fontSize:11,background:"#f0fdf4",color:"#16a34a",padding:"4px 10px",borderRadius:20,fontWeight:700}}>연동됨</div>}
+            {isManual&&<button style={{
+              padding:"6px 14px",borderRadius:20,border:"1.5px solid #eee",
+              background:"#fff",color:"#555",fontFamily:"'Noto Sans KR',sans-serif",
+              fontSize:12,fontWeight:700,cursor:"pointer"
+            }} onClick={onBack}>✕ 닫기</button>}
+          </div>
+        </div>
       </div>
 
       <div className="panel">
@@ -1991,17 +2188,6 @@ function FinalQuoteView({ fnq, setFnq, onSave, onBack, showToast }) {
           )}
         </div>
       )}
-
-      <div className="panel">
-        <div className="ptitle">보강판 (선택)</div>
-        <div className="reinf-grid">
-          {REINFORCEMENTS.map(r=>(
-            <button key={r.id} className={`reinf-btn ${f.reinforcements.find(x=>x.id===r.id)?"on":""}`} onClick={()=>toggleReinf(r)}>
-              {r.label}<div className="rprice">{fmt(r.price)}원</div>
-            </button>
-          ))}
-        </div>
-      </div>
 
       <div className="panel">
         <div className="ptitle">개조비 (선택)</div>
