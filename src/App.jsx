@@ -176,27 +176,27 @@ const api = {
   save: async (record) => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return { success:true };
     try {
-      const form = new FormData();
-      form.append("data", JSON.stringify({ action:"save", record }));
-      await fetch(SCRIPT_URL, { method:"POST", body:form, mode:"no-cors" });
+      const body = new URLSearchParams();
+      body.append("data", JSON.stringify({ action:"save", record }));
+      await fetch(SCRIPT_URL, { method:"POST", body, mode:"no-cors" });
     } catch(e) {}
     return { success:true };
   },
   update: async (id, fields) => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return { success:true };
     try {
-      const form = new FormData();
-      form.append("data", JSON.stringify({ action:"update", id, fields }));
-      await fetch(SCRIPT_URL, { method:"POST", body:form, mode:"no-cors" });
+      const body = new URLSearchParams();
+      body.append("data", JSON.stringify({ action:"update", id, fields }));
+      await fetch(SCRIPT_URL, { method:"POST", body, mode:"no-cors" });
     } catch(e) {}
     return { success:true };
   },
   delete: async (id) => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return { success:true };
     try {
-      const form = new FormData();
-      form.append("data", JSON.stringify({ action:"delete", id }));
-      await fetch(SCRIPT_URL, { method:"POST", body:form, mode:"no-cors" });
+      const body = new URLSearchParams();
+      body.append("data", JSON.stringify({ action:"delete", id }));
+      await fetch(SCRIPT_URL, { method:"POST", body, mode:"no-cors" });
     } catch(e) {}
     return { success:true };
   },
