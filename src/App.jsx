@@ -312,8 +312,21 @@ export default function App() {
 
   useEffect(() => { loadRecords(); }, [year, month]);
 
-  // ── 로컬 레코드 (항상 localRecords + 시트 records 합산) ──
-  const [localRecords, setLocalRecords] = useState([]);
+  // ── 로컬 레코드 (localStorage 영구 저장) ──
+  const [localRecords, setLocalRecordsState] = useState(()=>{
+    try {
+      const saved = localStorage.getItem("doorlock_records");
+      return saved ? JSON.parse(saved) : [];
+    } catch(e) { return []; }
+  });
+
+  const setLocalRecords = (updater) => {
+    setLocalRecordsState(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      try { localStorage.setItem("doorlock_records", JSON.stringify(next)); } catch(e) {}
+      return next;
+    });
+  };
   const monthStr = `${year}-${String(month+1).padStart(2,"0")}`;
   const sheetIds = new Set(records.map(r=>String(r.ID)));
   const mergedRecords = [
@@ -409,18 +422,23 @@ export default function App() {
   // ── 레코드 삭제 ──
   const deleteRecord = (id) => {
     setLocalRecords(p=>p.filter(r=>String(r.ID)!==String(id)));
+    setRecords(p=>p.filter(r=>String(r.ID)!==String(id)));
     if(SCRIPT_URL!=="여기에_URL_붙여넣기") {
-      api.delete(id).then(()=>loadRecords()).catch(()=>{});
+      api.delete(id).catch(()=>{});
     }
     showToast("🗑 삭제됐어요");
   };
 
-  // ── 상태 변경 ──
+  // ── 상태 변경 (Optimistic Update) ──
   const updateStatus = (id, status, extra={}) => {
     const fields = { 상태:status, ...extra };
+    // localRecords 업데이트
     setLocalRecords(p=>p.map(r=>String(r.ID)===String(id)?{...r,...fields}:r));
+    // records(시트 데이터)도 즉시 업데이트
+    setRecords(p=>p.map(r=>String(r.ID)===String(id)?{...r,...fields}:r));
+    // 구글 시트 백그라운드 동기화
     if(SCRIPT_URL!=="여기에_URL_붙여넣기") {
-      api.update(id, fields).then(()=>loadRecords()).catch(()=>{});
+      api.update(id, fields).catch(()=>{});
     }
   };
 
@@ -445,22 +463,23 @@ export default function App() {
       const fields = {
         상태:"완료", 총금액:total, 준형수령액:myEarnings,
         할인금액:discount, 자재원가:materialCost, 현장메모:note,
-        출장비: breakdown.출장비||TRAVEL_FEE,
         제품명: breakdown.설치제품||"",
         개문내역: breakdown.개문내역||"",
         개문금액: breakdown.개문금액||0,
         설치금액: breakdown.설치금액||0,
-        보강자재: breakdown.보강자재||"",
-        보강금액: breakdown.보강금액||0,
-        개조금액: breakdown.개조금액||0,
-        할증내역: breakdown.할증내역||"",
         기타항목: breakdown.기타항목||"",
         기타금액: breakdown.기타금액||0,
+        개조금액: breakdown.개조금액||0,
+        할증내역: breakdown.할증내역||"",
+        할증금액: breakdown.할증금액||0,
         결제방법: breakdown.결제방법||"",
+        출장비: breakdown.출장비||TRAVEL_FEE,
       };
+      // localRecords + records 즉시 업데이트
       setLocalRecords(p=>p.map(r=>String(r.ID)===String(fnq.recordId)?{...r,...fields}:r));
+      setRecords(p=>p.map(r=>String(r.ID)===String(fnq.recordId)?{...r,...fields}:r));
       if(SCRIPT_URL!=="여기에_URL_붙여넣기") {
-        api.update(fnq.recordId, fields).then(()=>loadRecords()).catch(()=>{});
+        api.update(fnq.recordId, fields).catch(()=>{});
       }
     }
   };
