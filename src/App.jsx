@@ -142,55 +142,63 @@ const getDaysInMonth  = (y,m) => new Date(y,m+1,0).getDate();
 const getFirstDayOfMonth = (y,m) => new Date(y,m,1).getDay();
 
 // ── API ──────────────────────────────────────────
+const fetchGAS = (url) => {
+  return new Promise((resolve, reject) => {
+    const id = "gas_" + Date.now();
+    const script = document.createElement("script");
+    window[id] = (data) => {
+      delete window[id];
+      document.head.removeChild(script);
+      resolve(data);
+    };
+    script.src = url + "&callback=" + id;
+    script.onerror = () => reject(new Error("fetch failed"));
+    document.head.appendChild(script);
+    setTimeout(() => reject(new Error("timeout")), 10000);
+  });
+};
+
 const api = {
   getMonth: async (month) => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return [];
     try {
-      const res = await fetch(`${SCRIPT_URL}?action=getMonth&month=${month}`);
-      const data = await res.json();
+      const data = await fetchGAS(`${SCRIPT_URL}?action=getMonth&month=${month}`);
       return Array.isArray(data) ? data : [];
     } catch(e) { return []; }
   },
   getAll: async () => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return [];
     try {
-      const res = await fetch(`${SCRIPT_URL}?action=getAll`);
-      const data = await res.json();
+      const data = await fetchGAS(`${SCRIPT_URL}?action=getAll`);
       return Array.isArray(data) ? data : [];
     } catch(e) { return []; }
   },
   save: async (record) => {
-    if (SCRIPT_URL === "여기에_URL_붙여넣기") return { success:true, id: Date.now().toString() };
+    if (SCRIPT_URL === "여기에_URL_붙여넣기") return { success:true };
     try {
-      const res = await fetch(SCRIPT_URL, {
-        method:"POST",
-        headers:{"Content-Type":"text/plain"},
-        body:JSON.stringify({ action:"save", record })
-      });
-      return res.json();
-    } catch(e) { return { success:true, id: Date.now().toString() }; }
+      const form = new FormData();
+      form.append("data", JSON.stringify({ action:"save", record }));
+      await fetch(SCRIPT_URL, { method:"POST", body:form, mode:"no-cors" });
+    } catch(e) {}
+    return { success:true };
   },
   update: async (id, fields) => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return { success:true };
     try {
-      const res = await fetch(SCRIPT_URL, {
-        method:"POST",
-        headers:{"Content-Type":"text/plain"},
-        body:JSON.stringify({ action:"update", id, fields })
-      });
-      return res.json();
-    } catch(e) { return { success:true }; }
+      const form = new FormData();
+      form.append("data", JSON.stringify({ action:"update", id, fields }));
+      await fetch(SCRIPT_URL, { method:"POST", body:form, mode:"no-cors" });
+    } catch(e) {}
+    return { success:true };
   },
   delete: async (id) => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return { success:true };
     try {
-      const res = await fetch(SCRIPT_URL, {
-        method:"POST",
-        headers:{"Content-Type":"text/plain"},
-        body:JSON.stringify({ action:"delete", id })
-      });
-      return res.json();
-    } catch(e) { return { success:true }; }
+      const form = new FormData();
+      form.append("data", JSON.stringify({ action:"delete", id }));
+      await fetch(SCRIPT_URL, { method:"POST", body:form, mode:"no-cors" });
+    } catch(e) {}
+    return { success:true };
   },
 };
 
