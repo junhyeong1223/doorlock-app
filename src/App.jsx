@@ -142,19 +142,30 @@ const getDaysInMonth  = (y,m) => new Date(y,m+1,0).getDate();
 const getFirstDayOfMonth = (y,m) => new Date(y,m,1).getDay();
 
 // ── API ──────────────────────────────────────────
+// JSONP 호출 카운터 (병렬 호출 시 ID 충돌 방지)
+let __gasCounter = 0;
 const fetchGAS = (url) => {
   return new Promise((resolve, reject) => {
-    const id = "gas_" + Date.now();
+    // Date.now() + counter + random 으로 절대 충돌 안 나는 ID 생성
+    __gasCounter = (__gasCounter + 1) % 1000000;
+    const id = "gas_" + Date.now() + "_" + __gasCounter + "_" + Math.floor(Math.random()*1000000);
     const script = document.createElement("script");
-    window[id] = (data) => {
+    let timeoutId = null;
+    
+    const cleanup = () => {
+      if (timeoutId) clearTimeout(timeoutId);
       delete window[id];
-      document.head.removeChild(script);
+      try { if (script.parentNode) script.parentNode.removeChild(script); } catch(e) {}
+    };
+    
+    window[id] = (data) => {
+      cleanup();
       resolve(data);
     };
     script.src = url + "&callback=" + id;
-    script.onerror = () => reject(new Error("fetch failed"));
+    script.onerror = () => { cleanup(); reject(new Error("fetch failed")); };
+    timeoutId = setTimeout(() => { cleanup(); reject(new Error("timeout")); }, 15000);
     document.head.appendChild(script);
-    setTimeout(() => reject(new Error("timeout")), 10000);
   });
 };
 
