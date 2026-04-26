@@ -1115,7 +1115,7 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* 가격 - 강조 */}
+                      {/* 가격 - 강조 (현재 선택된 모드의 가격만) */}
                       <div style={{
                         background:"#111",borderRadius:12,padding:"16px 18px",marginBottom:16,
                         display:"flex",justifyContent:"space-between",alignItems:"center"
@@ -1146,40 +1146,8 @@ export default function App() {
 
                     {/* 액션 버튼 영역 (캡처 영역 밖) */}
                     <div style={{padding:"0 20px 20px"}}>
-                      {/* 가격모드 토글 (사무실/숨고) */}
-                      <div style={{display:"flex",gap:6,marginTop:12,marginBottom:12}}>
-                        <button onClick={()=>setProdPriceMode("office")} style={{
-                          flex:1,padding:"8px",borderRadius:10,border:"1.5px solid",
-                          background: prodPriceMode==="office" ? "#111" : "#fff",
-                          color: prodPriceMode==="office" ? "#fff" : "#666",
-                          borderColor: prodPriceMode==="office" ? "#111" : "#ddd",
-                          fontFamily:"'Noto Sans KR',sans-serif",fontSize:12,fontWeight:700,cursor:"pointer"
-                        }}>🏢 사무실가</button>
-                        <button onClick={()=>setProdPriceMode("soomgo")} style={{
-                          flex:1,padding:"8px",borderRadius:10,border:"1.5px solid",
-                          background: prodPriceMode==="soomgo" ? "#111" : "#fff",
-                          color: prodPriceMode==="soomgo" ? "#fff" : "#666",
-                          borderColor: prodPriceMode==="soomgo" ? "#111" : "#ddd",
-                          fontFamily:"'Noto Sans KR',sans-serif",fontSize:12,fontWeight:700,cursor:"pointer"
-                        }}>📱 숨고가</button>
-                      </div>
-
-                      {/* 원가/차익 (내부용) */}
-                      <details style={{background:"#fafafa",borderRadius:10,padding:"10px 12px",marginBottom:12,fontSize:12}}>
-                        <summary style={{cursor:"pointer",color:"#888",fontWeight:600}}>🔒 내부 정보 (원가/차익)</summary>
-                        <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:6,color:"#666"}}>
-                          <div style={{display:"flex",justifyContent:"space-between"}}><span>원가</span><span style={{fontWeight:700,color:"#111"}}>{fmt(selectedProd.cost||0)}원</span></div>
-                          <div style={{display:"flex",justifyContent:"space-between"}}><span>사무실 차익</span><span style={{fontWeight:700,color:"#2563eb"}}>{fmt((selectedProd.price||0)-(selectedProd.cost||0))}원</span></div>
-                          <div style={{display:"flex",justifyContent:"space-between"}}><span>숨고 차익</span><span style={{fontWeight:700,color:"#16a34a"}}>{fmt(soomgoPrice(selectedProd.price||0)-(selectedProd.cost||0))}원</span></div>
-                        </div>
-                      </details>
-
-                      <div style={{fontSize:11,color:"#aaa",textAlign:"center",marginBottom:8}}>
-                        💡 화면 캡처해서 손님께 전송하세요
-                      </div>
-
                       {productList.find(x=>x.id===selectedProd.id) && (
-                        <div style={{display:"flex",gap:8}}>
+                        <div style={{display:"flex",gap:8,marginTop:12}}>
                           <button style={{
                             flex:1,padding:"12px",borderRadius:12,border:"1px solid #ddd",
                             background:"#fff",color:"#111",fontFamily:"'Noto Sans KR',sans-serif",
