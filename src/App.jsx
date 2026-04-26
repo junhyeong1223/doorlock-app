@@ -162,14 +162,14 @@ const api = {
   getMonth: async (month) => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return [];
     try {
-      const data = await fetchGAS(`${SCRIPT_URL}?action=getMonth&month=${month}`);
+      const data = await fetchGAS(`${SCRIPT_URL}?action=getMonth&month=${month}&_=${Date.now()}`);
       return Array.isArray(data) ? data : [];
     } catch(e) { return []; }
   },
   getAll: async () => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return [];
     try {
-      const data = await fetchGAS(`${SCRIPT_URL}?action=getAll`);
+      const data = await fetchGAS(`${SCRIPT_URL}?action=getAll&_=${Date.now()}`);
       return Array.isArray(data) ? data : [];
     } catch(e) { return []; }
   },
@@ -204,7 +204,7 @@ const api = {
   getMaterials: async () => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return [];
     try {
-      const data = await fetchGAS(`${SCRIPT_URL}?action=getMaterials`);
+      const data = await fetchGAS(`${SCRIPT_URL}?action=getMaterials&_=${Date.now()}`);
       return Array.isArray(data) ? data : [];
     } catch(e) { return []; }
   },
@@ -286,7 +286,7 @@ export default function App() {
   };
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
-  const [productForm, setProductForm] = useState({name:"",brand:"",type:"",price:"",cost:"",desc:"",note:""});
+  const [productForm, setProductForm] = useState({name:"",brand:"",type:"",price:"",cost:"",desc:"",note:"",grade:"",feature:"",shape:"",series:"",warranty:"",boxImg:"",installImg:""});
   const [prodBrandFilter, setProdBrandFilter] = useState("전체");
   const [prodTypeFilter,  setProdTypeFilter]  = useState("전체");
   const [prodPriceMode,   setProdPriceMode]   = useState("office"); // office | soomgo
@@ -368,8 +368,10 @@ export default function App() {
   useEffect(() => { loadRecords(); }, [year, month]);
 
   // ── 자재 목록을 시트에서 로드 (앱 시작 시 1번) ──
+  const [materialsLoading, setMaterialsLoading] = useState(false);
   const loadMaterials = async () => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return;
+    setMaterialsLoading(true);
     try {
       const data = await api.getMaterials();
       if (Array.isArray(data) && data.length > 0) {
@@ -382,11 +384,19 @@ export default function App() {
           price: Number(m["소매가"] || m.price || 0),
           cost:  Number(m["원가"]   || m.cost  || 0),
           note:  m["비고"]   || m.note  || "",
-          fromSheet: true, // 시트에서 온 자재(삭제/수정 가능 표시)
+          grade:      m["보안등급"]    || m.grade      || "",
+          feature:    m["특징"]        || m.feature    || "",
+          shape:      m["형태"]        || m.shape      || "",
+          series:     m["시리즈연동"]   || m.series     || "",
+          warranty:   m["보증"]        || m.warranty   || "",
+          boxImg:     m["박스사진URL"]  || m.boxImg     || "",
+          installImg: m["장착사진URL"]  || m.installImg || "",
+          fromSheet: true,
         }));
         setProductListPersist(mapped);
       }
     } catch(e) { console.error("loadMaterials error:", e); }
+    setMaterialsLoading(false);
   };
   useEffect(() => { loadMaterials(); }, []);
 
@@ -572,6 +582,7 @@ export default function App() {
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=DM+Mono:wght@400;500&display=swap');
+        @keyframes spin { to { transform: rotate(360deg); } }
         *{box-sizing:border-box;margin:0;padding:0;}
         body{background:#f4f4f2;font-family:'Noto Sans KR',sans-serif;}
         .app{min-height:100vh;max-width:420px;margin:0 auto;padding-bottom:100px;}
@@ -765,6 +776,18 @@ export default function App() {
 
         {/* ══════════ 캘린더 탭 ══════════ */}
         {tab==="calendar" && <>
+          {loading && (
+            <div style={{
+              padding:"10px 16px",background:"#fef3c7",borderBottom:"1px solid #fde68a",
+              display:"flex",alignItems:"center",gap:10,fontSize:13,color:"#92400e",fontWeight:600
+            }}>
+              <span className="spinner" style={{
+                display:"inline-block",width:14,height:14,border:"2px solid #fde68a",
+                borderTopColor:"#92400e",borderRadius:"50%",animation:"spin 0.8s linear infinite"
+              }}/>
+              데이터 불러오는 중...
+            </div>
+          )}
           <div className="cal-header">
             <div className="cal-header-top">
               <div className="month-nav">
@@ -938,16 +961,36 @@ export default function App() {
             (prodTypeFilter==="전체"||p.type===prodTypeFilter)
           );
           return <>
+          {materialsLoading && (
+            <div style={{
+              padding:"10px 16px",background:"#fef3c7",borderBottom:"1px solid #fde68a",
+              display:"flex",alignItems:"center",gap:10,fontSize:13,color:"#92400e",fontWeight:600
+            }}>
+              <span style={{
+                display:"inline-block",width:14,height:14,border:"2px solid #fde68a",
+                borderTopColor:"#92400e",borderRadius:"50%",animation:"spin 0.8s linear infinite"
+              }}/>
+              자재 불러오는 중...
+            </div>
+          )}
           <div className="page-top">
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",width:"100%"}}>
               <div>
                 <div className="page-title">자재 목록</div>
                 <div className="page-sub">{allProds.length}개 제품</div>
               </div>
-              <button style={{padding:"8px 16px",borderRadius:20,border:"none",background:"#111",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}
-                onClick={()=>{setProductForm({name:"",brand:"",type:"",price:"",cost:"",desc:"",note:""});setShowAddProduct(true);}}>
-                + 추가
-              </button>
+              <div style={{display:"flex",gap:6}}>
+                <button style={{padding:"8px 12px",borderRadius:20,border:"1px solid #ddd",background:"#fff",color:"#111",fontSize:14,cursor:"pointer",opacity:materialsLoading?0.5:1}}
+                  disabled={materialsLoading}
+                  onClick={async()=>{ await loadMaterials(); showToast("✅ 자재 목록 새로고침"); }}
+                  title="시트에서 다시 불러오기">
+                  <span style={{display:"inline-block",animation:materialsLoading?"spin 0.8s linear infinite":"none"}}>⟲</span>
+                </button>
+                <button style={{padding:"8px 16px",borderRadius:20,border:"none",background:"#111",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer"}}
+                  onClick={()=>{setProductForm({name:"",brand:"",type:"",price:"",cost:"",desc:"",note:"",grade:"",feature:"",shape:"",series:"",warranty:"",boxImg:"",installImg:""});setShowAddProduct(true);}}>
+                  + 추가
+                </button>
+              </div>
             </div>
           </div>
 
@@ -1028,81 +1071,228 @@ export default function App() {
           </div>
 
           {/* 제품 상세 팝업 */}
-          {selectedProd&&(
+          {selectedProd&&(()=>{
+            const isDoorlock = ["주키","보조키","푸쉬풀","강화유리"].includes(selectedProd.type);
+            return (
             <div className="modal-bg" onClick={()=>setSelectedProd(null)}>
-              <div className="modal" style={{maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-                <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
-                  <div>
-                    <div style={{fontSize:11,color:"#aaa",marginBottom:4}}>{selectedProd.brand} · {selectedProd.type}</div>
-                    <div style={{fontSize:20,fontWeight:900,color:"#111"}}>{selectedProd.name}</div>
-                    {selectedProd.note&&<div style={{fontSize:12,color:"#888",marginTop:4}}>{selectedProd.note}</div>}
-                  </div>
-                  <button style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#aaa"}} onClick={()=>setSelectedProd(null)}>✕</button>
-                </div>
+              <div className="modal" style={{maxHeight:"90vh",overflowY:"auto",padding:0}} onClick={e=>e.stopPropagation()}>
+                
+                {isDoorlock ? (
+                  /* ── 도어락 캡처용 카드 ── */
+                  <>
+                    <div id="capture-card" style={{
+                      background:"#fff",padding:"24px 20px",
+                      fontFamily:"'Noto Sans KR',sans-serif"
+                    }}>
+                      {/* 헤더 - 제품명 / 브랜드 */}
+                      <div style={{textAlign:"center",marginBottom:18,paddingBottom:14,borderBottom:"2px solid #111"}}>
+                        <div style={{fontSize:11,letterSpacing:3,color:"#888",fontWeight:700,marginBottom:4}}>{selectedProd.brand}</div>
+                        <div style={{fontSize:24,fontWeight:900,color:"#111",letterSpacing:-0.5}}>{selectedProd.name}</div>
+                        <div style={{fontSize:12,color:"#666",marginTop:4}}>{selectedProd.type}</div>
+                      </div>
 
-                <div style={{display:"flex",flexDirection:"column",gap:0}}>
-                  <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderBottom:"1px solid #f5f5f5"}}>
-                    <span style={{fontSize:13,color:"#888"}}>원가</span>
-                    <span style={{fontSize:14,fontWeight:700,color:"#111"}}>{fmt(selectedProd.cost||0)}원</span>
-                  </div>
-                  <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderBottom:"1px solid #f5f5f5"}}>
-                    <span style={{fontSize:13,color:"#888"}}>소매가 (사무실)</span>
-                    <span style={{fontSize:14,fontWeight:700,color:"#111"}}>{fmt(selectedProd.price||0)}원</span>
-                  </div>
-                  <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderBottom:"1px solid #f5f5f5"}}>
-                    <span style={{fontSize:13,color:"#888"}}>숨고가 (70%)</span>
-                    <span style={{fontSize:14,fontWeight:700,color:"#16a34a"}}>{fmt(soomgoPrice(selectedProd.price||0))}원</span>
-                  </div>
-                  <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderBottom:"1px solid #f5f5f5"}}>
-                    <span style={{fontSize:13,color:"#888"}}>사무실 차익</span>
-                    <span style={{fontSize:14,fontWeight:700,color:"#2563eb"}}>{fmt((selectedProd.price||0)-(selectedProd.cost||0))}원</span>
-                  </div>
-                  <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0"}}>
-                    <span style={{fontSize:13,color:"#888"}}>숨고 차익</span>
-                    <span style={{fontSize:14,fontWeight:700,color:"#16a34a"}}>{fmt(soomgoPrice(selectedProd.price||0)-(selectedProd.cost||0))}원</span>
-                  </div>
-                </div>
+                      {/* 사진 영역 */}
+                      <div style={{display:"flex",gap:8,marginBottom:18}}>
+                        <div style={{flex:1,aspectRatio:"1",background:"#f5f5f5",borderRadius:12,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          {selectedProd.boxImg ? (
+                            <img src={selectedProd.boxImg} alt="제품" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                          ) : (
+                            <div style={{textAlign:"center",color:"#bbb"}}>
+                              <div style={{fontSize:28,marginBottom:4}}>📦</div>
+                              <div style={{fontSize:10}}>제품 사진</div>
+                            </div>
+                          )}
+                        </div>
+                        <div style={{flex:1,aspectRatio:"1",background:"#f5f5f5",borderRadius:12,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center"}}>
+                          {selectedProd.installImg ? (
+                            <img src={selectedProd.installImg} alt="장착" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                          ) : (
+                            <div style={{textAlign:"center",color:"#bbb"}}>
+                              <div style={{fontSize:28,marginBottom:4}}>🔧</div>
+                              <div style={{fontSize:10}}>장착 사진</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
 
-                {productList.find(x=>x.id===selectedProd.id)&&(
-                  <div style={{display:"flex",gap:8,marginTop:16}}>
-                    <button style={{
-                      flex:1,padding:"12px",borderRadius:12,border:"1px solid #ddd",
-                      background:"#fff",color:"#111",fontFamily:"'Noto Sans KR',sans-serif",
-                      fontSize:13,fontWeight:700,cursor:"pointer"
-                    }} onClick={()=>{
-                      setProductForm({
-                        brand: selectedProd.brand||"",
-                        name:  selectedProd.name||"",
-                        type:  selectedProd.type||"",
-                        price: selectedProd.price||"",
-                        cost:  selectedProd.cost||"",
-                        note:  selectedProd.note||"",
-                        desc:  selectedProd.desc||"",
-                      });
-                      setEditProduct(selectedProd);
-                      setSelectedProd(null);
-                    }}>✏️ 수정</button>
-                    <button style={{
-                      flex:1,padding:"12px",borderRadius:12,border:"1px solid #fee2e2",
-                      background:"#fff",color:"#dc2626",fontFamily:"'Noto Sans KR',sans-serif",
-                      fontSize:13,fontWeight:700,cursor:"pointer"
-                    }} onClick={()=>{
-                      if (!confirm(`"${selectedProd.name}" 삭제할까요?`)) return;
-                      const id = selectedProd.id;
-                      setProductListPersist(l=>l.filter(x=>x.id!==id));
-                      if (SCRIPT_URL!=="여기에_URL_붙여넣기") api.deleteMaterial(id).catch(()=>{});
-                      setSelectedProd(null);
-                      showToast("🗑 삭제됐어요");
-                    }}>🗑 삭제</button>
+                      {/* 가격 - 강조 */}
+                      <div style={{
+                        background:"#111",borderRadius:12,padding:"16px 18px",marginBottom:16,
+                        display:"flex",justifyContent:"space-between",alignItems:"center"
+                      }}>
+                        <span style={{fontSize:11,color:"rgba(255,255,255,.6)",letterSpacing:2,fontWeight:700}}>가 격</span>
+                        <span style={{fontSize:22,fontWeight:900,color:"#fff",fontFamily:"'DM Mono',monospace"}}>
+                          {fmt(prodPriceMode==="soomgo" ? soomgoPrice(selectedProd.price||0) : (selectedProd.price||0))}원
+                        </span>
+                      </div>
+
+                      {/* 스펙 정보 */}
+                      <div style={{display:"flex",flexDirection:"column",gap:0}}>
+                        {[
+                          {label:"보안등급", value:selectedProd.grade},
+                          {label:"특징/기능", value:selectedProd.feature},
+                          {label:"형태", value:selectedProd.shape},
+                          {label:"시리즈연동", value:selectedProd.series},
+                          {label:"보증", value:selectedProd.warranty},
+                          {label:"비고", value:selectedProd.note},
+                        ].filter(s=>s.value).map((s,i)=>(
+                          <div key={i} style={{display:"flex",padding:"10px 0",borderBottom:"1px solid #f0f0f0",fontSize:13}}>
+                            <span style={{flex:"0 0 90px",color:"#888",fontWeight:600}}>{s.label}</span>
+                            <span style={{flex:1,color:"#111",fontWeight:500}}>{s.value}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 액션 버튼 영역 (캡처 영역 밖) */}
+                    <div style={{padding:"0 20px 20px"}}>
+                      {/* 가격모드 토글 (사무실/숨고) */}
+                      <div style={{display:"flex",gap:6,marginTop:12,marginBottom:12}}>
+                        <button onClick={()=>setProdPriceMode("office")} style={{
+                          flex:1,padding:"8px",borderRadius:10,border:"1.5px solid",
+                          background: prodPriceMode==="office" ? "#111" : "#fff",
+                          color: prodPriceMode==="office" ? "#fff" : "#666",
+                          borderColor: prodPriceMode==="office" ? "#111" : "#ddd",
+                          fontFamily:"'Noto Sans KR',sans-serif",fontSize:12,fontWeight:700,cursor:"pointer"
+                        }}>🏢 사무실가</button>
+                        <button onClick={()=>setProdPriceMode("soomgo")} style={{
+                          flex:1,padding:"8px",borderRadius:10,border:"1.5px solid",
+                          background: prodPriceMode==="soomgo" ? "#111" : "#fff",
+                          color: prodPriceMode==="soomgo" ? "#fff" : "#666",
+                          borderColor: prodPriceMode==="soomgo" ? "#111" : "#ddd",
+                          fontFamily:"'Noto Sans KR',sans-serif",fontSize:12,fontWeight:700,cursor:"pointer"
+                        }}>📱 숨고가</button>
+                      </div>
+
+                      {/* 원가/차익 (내부용) */}
+                      <details style={{background:"#fafafa",borderRadius:10,padding:"10px 12px",marginBottom:12,fontSize:12}}>
+                        <summary style={{cursor:"pointer",color:"#888",fontWeight:600}}>🔒 내부 정보 (원가/차익)</summary>
+                        <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:6,color:"#666"}}>
+                          <div style={{display:"flex",justifyContent:"space-between"}}><span>원가</span><span style={{fontWeight:700,color:"#111"}}>{fmt(selectedProd.cost||0)}원</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between"}}><span>사무실 차익</span><span style={{fontWeight:700,color:"#2563eb"}}>{fmt((selectedProd.price||0)-(selectedProd.cost||0))}원</span></div>
+                          <div style={{display:"flex",justifyContent:"space-between"}}><span>숨고 차익</span><span style={{fontWeight:700,color:"#16a34a"}}>{fmt(soomgoPrice(selectedProd.price||0)-(selectedProd.cost||0))}원</span></div>
+                        </div>
+                      </details>
+
+                      <div style={{fontSize:11,color:"#aaa",textAlign:"center",marginBottom:8}}>
+                        💡 화면 캡처해서 손님께 전송하세요
+                      </div>
+
+                      {productList.find(x=>x.id===selectedProd.id) && (
+                        <div style={{display:"flex",gap:8}}>
+                          <button style={{
+                            flex:1,padding:"12px",borderRadius:12,border:"1px solid #ddd",
+                            background:"#fff",color:"#111",fontFamily:"'Noto Sans KR',sans-serif",
+                            fontSize:13,fontWeight:700,cursor:"pointer"
+                          }} onClick={()=>{
+                            setProductForm({
+                              brand: selectedProd.brand||"", name: selectedProd.name||"",
+                              type: selectedProd.type||"", price: selectedProd.price||"",
+                              cost: selectedProd.cost||"", note: selectedProd.note||"",
+                              desc: selectedProd.desc||"",
+                              grade: selectedProd.grade||"", feature: selectedProd.feature||"",
+                              shape: selectedProd.shape||"", series: selectedProd.series||"",
+                              warranty: selectedProd.warranty||"",
+                              boxImg: selectedProd.boxImg||"", installImg: selectedProd.installImg||"",
+                            });
+                            setEditProduct(selectedProd);
+                            setSelectedProd(null);
+                          }}>✏️ 수정</button>
+                          <button style={{
+                            flex:1,padding:"12px",borderRadius:12,border:"1px solid #fee2e2",
+                            background:"#fff",color:"#dc2626",fontFamily:"'Noto Sans KR',sans-serif",
+                            fontSize:13,fontWeight:700,cursor:"pointer"
+                          }} onClick={()=>{
+                            if (!confirm(`"${selectedProd.name}" 삭제할까요?`)) return;
+                            const id = selectedProd.id;
+                            setProductListPersist(l=>l.filter(x=>x.id!==id));
+                            if (SCRIPT_URL!=="여기에_URL_붙여넣기") api.deleteMaterial(id).catch(()=>{});
+                            setSelectedProd(null);
+                            showToast("🗑 삭제됐어요");
+                          }}>🗑 삭제</button>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                ) : (
+                  /* ── 부자재 (기존 간단 팝업) ── */
+                  <div style={{padding:24}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:16}}>
+                      <div>
+                        <div style={{fontSize:11,color:"#aaa",marginBottom:4}}>{selectedProd.brand} · {selectedProd.type}</div>
+                        <div style={{fontSize:20,fontWeight:900,color:"#111"}}>{selectedProd.name}</div>
+                        {selectedProd.note&&<div style={{fontSize:12,color:"#888",marginTop:4}}>{selectedProd.note}</div>}
+                      </div>
+                      <button style={{background:"none",border:"none",fontSize:20,cursor:"pointer",color:"#aaa"}} onClick={()=>setSelectedProd(null)}>✕</button>
+                    </div>
+
+                    <div style={{display:"flex",flexDirection:"column",gap:0}}>
+                      <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderBottom:"1px solid #f5f5f5"}}>
+                        <span style={{fontSize:13,color:"#888"}}>원가</span>
+                        <span style={{fontSize:14,fontWeight:700,color:"#111"}}>{fmt(selectedProd.cost||0)}원</span>
+                      </div>
+                      <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderBottom:"1px solid #f5f5f5"}}>
+                        <span style={{fontSize:13,color:"#888"}}>소매가 (사무실)</span>
+                        <span style={{fontSize:14,fontWeight:700,color:"#111"}}>{fmt(selectedProd.price||0)}원</span>
+                      </div>
+                      <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderBottom:"1px solid #f5f5f5"}}>
+                        <span style={{fontSize:13,color:"#888"}}>숨고가 (70%)</span>
+                        <span style={{fontSize:14,fontWeight:700,color:"#16a34a"}}>{fmt(soomgoPrice(selectedProd.price||0))}원</span>
+                      </div>
+                      <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0",borderBottom:"1px solid #f5f5f5"}}>
+                        <span style={{fontSize:13,color:"#888"}}>사무실 차익</span>
+                        <span style={{fontSize:14,fontWeight:700,color:"#2563eb"}}>{fmt((selectedProd.price||0)-(selectedProd.cost||0))}원</span>
+                      </div>
+                      <div style={{display:"flex",justifyContent:"space-between",padding:"12px 0"}}>
+                        <span style={{fontSize:13,color:"#888"}}>숨고 차익</span>
+                        <span style={{fontSize:14,fontWeight:700,color:"#16a34a"}}>{fmt(soomgoPrice(selectedProd.price||0)-(selectedProd.cost||0))}원</span>
+                      </div>
+                    </div>
+
+                    {productList.find(x=>x.id===selectedProd.id)&&(
+                      <div style={{display:"flex",gap:8,marginTop:16}}>
+                        <button style={{
+                          flex:1,padding:"12px",borderRadius:12,border:"1px solid #ddd",
+                          background:"#fff",color:"#111",fontFamily:"'Noto Sans KR',sans-serif",
+                          fontSize:13,fontWeight:700,cursor:"pointer"
+                        }} onClick={()=>{
+                          setProductForm({
+                            brand: selectedProd.brand||"", name: selectedProd.name||"",
+                            type: selectedProd.type||"", price: selectedProd.price||"",
+                            cost: selectedProd.cost||"", note: selectedProd.note||"",
+                            desc: selectedProd.desc||"",
+                            grade: selectedProd.grade||"", feature: selectedProd.feature||"",
+                            shape: selectedProd.shape||"", series: selectedProd.series||"",
+                            warranty: selectedProd.warranty||"",
+                            boxImg: selectedProd.boxImg||"", installImg: selectedProd.installImg||"",
+                          });
+                          setEditProduct(selectedProd);
+                          setSelectedProd(null);
+                        }}>✏️ 수정</button>
+                        <button style={{
+                          flex:1,padding:"12px",borderRadius:12,border:"1px solid #fee2e2",
+                          background:"#fff",color:"#dc2626",fontFamily:"'Noto Sans KR',sans-serif",
+                          fontSize:13,fontWeight:700,cursor:"pointer"
+                        }} onClick={()=>{
+                          if (!confirm(`"${selectedProd.name}" 삭제할까요?`)) return;
+                          const id = selectedProd.id;
+                          setProductListPersist(l=>l.filter(x=>x.id!==id));
+                          if (SCRIPT_URL!=="여기에_URL_붙여넣기") api.deleteMaterial(id).catch(()=>{});
+                          setSelectedProd(null);
+                          showToast("🗑 삭제됐어요");
+                        }}>🗑 삭제</button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* 자재 추가/수정 모달 */}
           {(showAddProduct || editProduct) && (
-            <div className="modal-bg" onClick={()=>{ setShowAddProduct(false); setEditProduct(null); setProductForm({name:"",brand:"",type:"",price:"",cost:"",desc:"",note:""}); }}>
+            <div className="modal-bg" onClick={()=>{ setShowAddProduct(false); setEditProduct(null); setProductForm({name:"",brand:"",type:"",price:"",cost:"",desc:"",note:"",grade:"",feature:"",shape:"",series:"",warranty:"",boxImg:"",installImg:""}); }}>
               <div className="modal" style={{maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
                 <h3 style={{marginBottom:16}}>{editProduct ? "✏️ 자재 수정" : "📦 자재 추가"}</h3>
                 {[
@@ -1111,7 +1301,14 @@ export default function App() {
                   {key:"type", label:"종류",      placeholder:"예) 보조키"},
                   {key:"price",label:"소매가",    placeholder:"0", type:"number"},
                   {key:"cost", label:"원가(비공개)", placeholder:"0", type:"number"},
-                  {key:"note", label:"보안/특이사항", placeholder:"예) 1way, 지문인식 등"},
+                  {key:"note", label:"비고",      placeholder:"예) 목문형, 1way 등"},
+                  {key:"grade",label:"보안등급",   placeholder:"예) 1등급, 2등급"},
+                  {key:"feature",label:"특징/기능", placeholder:"예) 지문인식, 카드+비번"},
+                  {key:"shape",label:"형태",      placeholder:"예) 사각형, 원형"},
+                  {key:"series",label:"시리즈연동", placeholder:"예) 가능 / 불가"},
+                  {key:"warranty",label:"보증",   placeholder:"예) 1년 무상"},
+                  {key:"boxImg",label:"📦 박스사진 URL", placeholder:"https://..."},
+                  {key:"installImg",label:"🔧 장착사진 URL", placeholder:"https://..."},
                   {key:"desc", label:"메모",      placeholder:"기타 설명"},
                 ].map(f=>(
                   <div key={f.key} style={{marginBottom:14}}>
@@ -1137,6 +1334,13 @@ export default function App() {
                     price:Number(productForm.price)||0,
                     cost:Number(productForm.cost)||0,
                     note:productForm.note||"", desc:productForm.desc||"",
+                    grade:      productForm.grade||"",
+                    feature:    productForm.feature||"",
+                    shape:      productForm.shape||"",
+                    series:     productForm.series||"",
+                    warranty:   productForm.warranty||"",
+                    boxImg:     productForm.boxImg||"",
+                    installImg: productForm.installImg||"",
                     fromSheet: true,
                   };
                   if (isEdit) {
@@ -1148,7 +1352,7 @@ export default function App() {
                   }
                   setShowAddProduct(false);
                   setEditProduct(null);
-                  setProductForm({name:"",brand:"",type:"",price:"",cost:"",desc:"",note:""});
+                  setProductForm({name:"",brand:"",type:"",price:"",cost:"",desc:"",note:"",grade:"",feature:"",shape:"",series:"",warranty:"",boxImg:"",installImg:""});
                   showToast(isEdit ? "✅ 자재 수정됐어요!" : "✅ 자재 추가됐어요!");
                 }}>{editProduct ? "수정" : "추가"}</button>
               </div>
