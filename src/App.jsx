@@ -312,9 +312,15 @@ export default function App() {
   // ── 데이터 로드 ──
   const loadRecords = async () => {
     setLoading(true);
+    const monthStr2 = `${year}-${String(month+1).padStart(2,"0")}`;
+    
+    // 두 호출을 병렬로 동시에 보냄 (시간 절반)
+    const monthPromise = api.getMonth(monthStr2);
+    const allPromise   = api.getAll();
+    
+    // 1️⃣ getMonth가 먼저 도착하면 → 캘린더 즉시 표시 + 로딩 해제
     try {
-      const monthStr2 = `${year}-${String(month+1).padStart(2,"0")}`;
-      const data = await api.getMonth(monthStr2);
+      const data = await monthPromise;
       const mapped = (Array.isArray(data)?data:[]).map(r=>({
         ...r,
         ID: String(r.ID||r["ID"]||""),
@@ -342,7 +348,15 @@ export default function App() {
         출장비: Number(r["출장비"]||30000),
       }));
       setRecords(mapped);
-      const allData = await api.getAll();
+      setLoading(false); // 캘린더 보일 수 있으니 로딩 즉시 해제
+    } catch(e) {
+      console.error("loadRecords error (month):", e);
+      setLoading(false);
+    }
+    
+    // 2️⃣ getAll은 백그라운드로 마저 처리 (대기/예약 탭용)
+    try {
+      const allData = await allPromise;
       const allMapped = (Array.isArray(allData)?allData:[]).map(r=>({
         ...r,
         ID: String(r.ID||""),
@@ -360,9 +374,8 @@ export default function App() {
       }));
       setAllTimeRecords(allMapped);
     } catch(e) {
-      console.error("loadRecords error:", e);
+      console.error("loadRecords error (all):", e);
     }
-    setLoading(false);
   };
 
   useEffect(() => { loadRecords(); }, [year, month]);
@@ -795,9 +808,18 @@ export default function App() {
                 <div><span className="month-title">{MONTHS[month]}</span><span className="month-year">{year}</span></div>
                 <button className="nav-btn" onClick={()=>{if(month===11){setYear(y=>y+1);setMonth(0);}else setMonth(m=>m+1);setSelectedDate(null);}}>›</button>
               </div>
-              <div style={{textAlign:"right"}}>
-                <div style={{fontSize:11,color:"rgba(255,255,255,.4)"}}>이번달 수령</div>
-                <div style={{fontSize:18,fontWeight:900,color:"#4ade80",fontFamily:"'DM Mono',monospace"}}>{fmt(monthEarnings)}원</div>
+              <div style={{display:"flex",alignItems:"center",gap:10}}>
+                <button onClick={()=>loadRecords()} disabled={loading} style={{
+                  padding:"6px 10px",borderRadius:8,border:"1px solid rgba(255,255,255,.2)",
+                  background:"rgba(255,255,255,.08)",color:"#fff",fontSize:14,cursor:"pointer",
+                  opacity:loading?0.4:1
+                }} title="시트에서 다시 불러오기">
+                  <span style={{display:"inline-block",animation:loading?"spin 0.8s linear infinite":"none"}}>⟲</span>
+                </button>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontSize:11,color:"rgba(255,255,255,.4)"}}>이번달 수령</div>
+                  <div style={{fontSize:18,fontWeight:900,color:"#4ade80",fontFamily:"'DM Mono',monospace"}}>{fmt(monthEarnings)}원</div>
+                </div>
               </div>
             </div>
             <div className="month-stats">
