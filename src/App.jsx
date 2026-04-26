@@ -256,6 +256,7 @@ export default function App() {
   const [records, setRecords] = useState([]);
   const [allTimeRecords, setAllTimeRecords] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false); // 저장 중 더블클릭 방지
   const [toast, setToast]   = useState(null);
   const showToast = (msg, type="success") => {
     setToast({msg,type});
@@ -352,13 +353,16 @@ export default function App() {
         취소사유: r["취소사유"]||r.cancelReason||"",
         결제방법: r["결제방법"]||"",
         영수증: r["영수증"]||"",
-        결제완료: r["결제완료"]||false,
+        결제완료: r["결제완료"]===true || r["결제완료"]==="TRUE" || r["결제완료"]==="true",
         부가세: Number(r["부가세"]||0),
         개문금액: Number(r["개문금액"]||0),
         설치금액: Number(r["설치금액"]||0),
         출장비: Number(r["출장비"]||30000),
       }));
       setRecords(mapped);
+      // 시트에 저장된 ID는 localRecords에서 제거 (중복 표시 방지)
+      const sheetIdSet = new Set(mapped.map(r=>String(r.ID)));
+      setLocalRecords(p => p.filter(r => !sheetIdSet.has(String(r.ID))));
       setLoading(false); // 캘린더 보일 수 있으니 로딩 즉시 해제
     } catch(e) {
       console.error("loadRecords error (month):", e);
@@ -381,7 +385,7 @@ export default function App() {
         자재원가: Number(r["자재원가"]||0),
         현장메모: r["현장메모"]||"",
         결제방법: r["결제방법"]||"",
-        결제완료: r["결제완료"]||false,
+        결제완료: r["결제완료"]===true || r["결제완료"]==="TRUE" || r["결제완료"]==="true",
       }));
       setAllTimeRecords(allMapped);
     } catch(e) {
@@ -424,6 +428,17 @@ export default function App() {
   };
   useEffect(() => { loadMaterials(); }, []);
 
+  // 모바일 최적화: viewport 메타태그 자동 설정
+  useEffect(() => {
+    let viewport = document.querySelector('meta[name="viewport"]');
+    if (!viewport) {
+      viewport = document.createElement("meta");
+      viewport.name = "viewport";
+      document.head.appendChild(viewport);
+    }
+    viewport.content = "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover";
+  }, []);
+
   // ── 로컬 레코드 (localStorage 영구 저장) ──
   const [localRecords, setLocalRecordsState] = useState(()=>{
     try {
@@ -456,11 +471,10 @@ export default function App() {
     byDate[r.날짜].push(r);
   });
 
-  // 월 통계 (완료 + 출장비 발생한 취소건 포함)
-  const billable = mergedRecords.filter(r=>r.상태==="완료"||(r.상태==="취소"&&Number(r.총금액||0)>0));
-  const monthTotal    = billable.reduce((a,r)=>a+Number(r.총금액||0),0);
-  const monthEarnings = billable.reduce((a,r)=>a+Number(r.준형수령액||0),0);
-  const completed     = mergedRecords.filter(r=>r.상태==="완료");
+  // 월 통계 (완료된 작업만)
+  const completed = mergedRecords.filter(r=>r.상태==="완료");
+  const monthTotal    = completed.reduce((a,r)=>a+Number(r.총금액||0),0);
+  const monthEarnings = completed.reduce((a,r)=>a+Number(r.준형수령액||0),0);
 
   // 캘린더 그리드
   const daysInMonth  = getDaysInMonth(year, month);
@@ -481,6 +495,8 @@ export default function App() {
 
   // ── 최초 견적서 저장 ──
   const saveFirstQuote = (status="견적대기") => {
+    if (saving) return; // 더블클릭 방지
+    setSaving(true);
     const needOpen    = fq.workType?.id==="open"    || fq.workType?.id==="both";
     const needInstall = fq.workType?.id==="install" || fq.workType?.id==="both";
     const openTotal   = fq.openItems.reduce((a,i)=>a+(i.actual||0)*i.qty, 0);
@@ -512,12 +528,15 @@ export default function App() {
     };
     setLocalRecords(p=>[...p,saved]);
     if(SCRIPT_URL!=="여기에_URL_붙여넣기") {
-      api.save(record).then(()=>loadRecords()).catch(()=>{});
+      // 시트 저장 완료까지 대기 후 reload (no-cors라 응답 못 받음)
+      api.save(record).catch(()=>{});
+      setTimeout(() => loadRecords(), 1500);
     }
     setFq({channel:null,phone:"",address:"",workType:null,openItems:[],installItems:[],surcharges:[],memo:"",reserveDate:"",reserveTime:"",noTravel:false});
     setFqStep("form");
     setTab(isReserve?"pending":"calendar");
     if(!isReserve) setSelectedDate(todayStr());
+    setTimeout(() => setSaving(false), 2000); // 2초 후 락 해제
   };
 
   // 견적 카드 미리보기용 계산
@@ -847,7 +866,7 @@ export default function App() {
                   const recs=ds?(byDate[ds]||[]):[];
                   const dayDone = recs.filter(r=>r.상태==="완료").length;
                   const dayReserve = recs.filter(r=>r.상태==="예약").length;
-                  const dayEarnings = recs.filter(r=>r.상태==="완료"||(r.상태==="취소"&&Number(r.총금액||0)>0)).reduce((a,r)=>a+Number(r.준형수령액||0),0);
+                  const dayEarnings = recs.filter(r=>r.상태==="완료").reduce((a,r)=>a+Number(r.준형수령액||0),0);
                   return (
                     <div key={i}
                       className={["day-cell",recs.length?"has-rec":"",selectedDate===ds?"sel":"",isToday(d)?"today":""].join(" ")}
@@ -1128,7 +1147,8 @@ export default function App() {
                       <div style={{display:"flex",gap:8,marginBottom:18}}>
                         <div style={{flex:1,aspectRatio:"1",background:"#f5f5f5",borderRadius:12,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center"}}>
                           {selectedProd.boxImg ? (
-                            <img src={selectedProd.boxImg} alt="제품" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                            <img src={selectedProd.boxImg} alt="제품" style={{width:"100%",height:"100%",objectFit:"cover"}}
+                              onError={e=>{ e.target.style.display="none"; e.target.parentNode.innerHTML='<div style="text-align:center;color:#bbb"><div style="font-size:28px;margin-bottom:4px">📦</div><div style="font-size:10px">사진 없음</div></div>'; }}/>
                           ) : (
                             <div style={{textAlign:"center",color:"#bbb"}}>
                               <div style={{fontSize:28,marginBottom:4}}>📦</div>
@@ -1138,7 +1158,8 @@ export default function App() {
                         </div>
                         <div style={{flex:1,aspectRatio:"1",background:"#f5f5f5",borderRadius:12,overflow:"hidden",display:"flex",alignItems:"center",justifyContent:"center"}}>
                           {selectedProd.installImg ? (
-                            <img src={selectedProd.installImg} alt="장착" style={{width:"100%",height:"100%",objectFit:"cover"}}/>
+                            <img src={selectedProd.installImg} alt="장착" style={{width:"100%",height:"100%",objectFit:"cover"}}
+                              onError={e=>{ e.target.style.display="none"; e.target.parentNode.innerHTML='<div style="text-align:center;color:#bbb"><div style="font-size:28px;margin-bottom:4px">🔧</div><div style="font-size:10px">사진 없음</div></div>'; }}/>
                           ) : (
                             <div style={{textAlign:"center",color:"#bbb"}}>
                               <div style={{fontSize:28,marginBottom:4}}>🔧</div>
@@ -1148,12 +1169,15 @@ export default function App() {
                         </div>
                       </div>
 
-                      {/* 가격 - 강조 (현재 선택된 모드의 가격만) */}
+                      {/* 가격 - 강조 (자재 탭에서 선택한 모드 적용) */}
                       <div style={{
                         background:"#111",borderRadius:12,padding:"16px 18px",marginBottom:16,
                         display:"flex",justifyContent:"space-between",alignItems:"center"
                       }}>
-                        <span style={{fontSize:11,color:"rgba(255,255,255,.6)",letterSpacing:2,fontWeight:700}}>가 격</span>
+                        <div>
+                          <div style={{fontSize:11,color:"rgba(255,255,255,.6)",letterSpacing:2,fontWeight:700}}>가 격</div>
+                          <div style={{fontSize:9,color:"rgba(255,255,255,.4)",marginTop:2}}>{prodPriceMode==="soomgo"?"📱 숨고":"🏢 사무실"}</div>
+                        </div>
                         <span style={{fontSize:22,fontWeight:900,color:"#fff",fontFamily:"'DM Mono',monospace"}}>
                           {fmt(prodPriceMode==="soomgo" ? soomgoPrice(selectedProd.price||0) : (selectedProd.price||0))}원
                         </span>
@@ -2065,8 +2089,13 @@ export default function App() {
                   value={reserveForm.time}
                   maxLength={5}
                   onChange={e=>{
-                    let v=e.target.value.replace(/[^0-9]/g,"");
-                    if(v.length>=3) v=v.slice(0,2)+":"+v.slice(2,4);
+                    let v=e.target.value.replace(/[^0-9]/g,"").slice(0,4);
+                    if (v.length >= 3) {
+                      let hh = v.slice(0,2), mm = v.slice(2,4);
+                      if (Number(hh) > 23) hh = "23";
+                      if (mm.length === 2 && Number(mm) > 59) mm = "59";
+                      v = hh + ":" + mm;
+                    }
                     setReserveForm(f=>({...f,time:v}));
                   }} />
               </div>
@@ -2172,7 +2201,15 @@ export default function App() {
           const costTotal = (af.products||[]).reduce((a,p)=>a+p.cost*(p.qty||1),0);
           const myE       = isSoomgo ? subTotal-costTotal : Math.round((subTotal-costTotal)*0.5);
           const filteredP = (af.productFilter||"전체")==="전체" ? allMaterials : allMaterials.filter(p=>p.type===af.productFilter);
-          const fmtTime = v => { const d=v.replace(/\D/g,"").slice(0,4); return d.length>=3?d.slice(0,2)+":"+d.slice(2):d; };
+          const fmtTime = v => {
+            const d = v.replace(/\D/g,"").slice(0,4);
+            if (d.length < 3) return d;
+            let hh = d.slice(0,2), mm = d.slice(2);
+            // 시간 검증: 24를 넘으면 23으로, 분이 59를 넘으면 59로
+            if (Number(hh) > 23) hh = "23";
+            if (mm.length === 2 && Number(mm) > 59) mm = "59";
+            return hh + ":" + mm;
+          };
 
           return (
           <div className="modal-bg" onClick={()=>setShowAddRecord(false)}>
@@ -2256,7 +2293,9 @@ export default function App() {
               </div>}
 
               <div style={{padding:"4px 12px 24px"}}>
-                <button style={{width:"100%",padding:"15px",borderRadius:14,border:"none",background:"#111",color:"#fff",fontFamily:"'Noto Sans KR',sans-serif",fontSize:15,fontWeight:700,cursor:"pointer"}} onClick={()=>{
+                <button disabled={saving} style={{width:"100%",padding:"15px",borderRadius:14,border:"none",background:saving?"#999":"#111",color:"#fff",fontFamily:"'Noto Sans KR',sans-serif",fontSize:15,fontWeight:700,cursor:saving?"wait":"pointer",opacity:saving?0.6:1}} onClick={()=>{
+                  if (saving) return;
+                  setSaving(true);
                   const id=Date.now().toString();
                   const openLabel=(af.openItems||[]).map(i=>`${i.label}${i.qty>1?` ×${i.qty}`:""}`).join(", ");
                   const prodLabel=(af.products||[]).map(p=>`${p.brand} ${p.name}${(p.qty||1)>1?` ×${p.qty||1}`:""}`).join(", ");
@@ -2269,15 +2308,19 @@ export default function App() {
                     제품명:prodLabel, 설치금액:needInstall?prodTotal:0,
                     총금액:subTotal, 준형수령액:myE,
                     자재원가:costTotal,
-                    자재내역:(af.products||[]).map(p=>`${p.brand} ${p.name}${(p.qty||1)>1?` ×${p.qty||1}`:""} (원가 ${fmt(p.cost*(p.qty||1))}원)`).join(", "),
+                    자재내역:(af.products||[]).map(p=>`${p.brand} ${p.name}${(p.qty||1)>1?` ×${p.qty||1}`:""}`).join(", "),
                     현장메모:af.note||"",
                   };
                   setLocalRecords(p=>[...p,saved]);
-                  if(SCRIPT_URL!=="여기에_URL_붙여넣기") api.save({date:selectedDate,time:saved.시간,channel:af.channel,status:af.status,phone:af.phone,address:af.address,workType:af.workType,openType:openLabel,product:prodLabel,total:subTotal,myEarnings:myE,materialCost:costTotal,note:af.note}).then(()=>loadRecords()).catch(()=>{});
+                  if(SCRIPT_URL!=="여기에_URL_붙여넣기") {
+                    api.save({date:selectedDate,time:saved.시간,channel:af.channel,status:af.status,phone:af.phone,address:af.address,workType:af.workType,openType:openLabel,product:prodLabel,total:subTotal,myEarnings:myE,materialCost:costTotal,note:af.note}).catch(()=>{});
+                    setTimeout(() => loadRecords(), 1500);
+                  }
                   setAddForm({channel:"office",time:"",workType:"",status:"완료",phone:"",address:"",note:"",openItems:[],products:[],productFilter:"전체",noTravel:false});
                   setShowAddRecord(false);
                   showToast("✅ 저장됐어요!");
-                }}>✅ 저장</button>
+                  setTimeout(() => setSaving(false), 2000);
+                }}>{saving ? "저장 중..." : "✅ 저장"}</button>
               </div>
             </div>
           </div>
