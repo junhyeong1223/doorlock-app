@@ -200,6 +200,41 @@ const api = {
     } catch(e) {}
     return { success:true };
   },
+  // ─── 자재 관리 ───
+  getMaterials: async () => {
+    if (SCRIPT_URL === "여기에_URL_붙여넣기") return [];
+    try {
+      const data = await fetchGAS(`${SCRIPT_URL}?action=getMaterials`);
+      return Array.isArray(data) ? data : [];
+    } catch(e) { return []; }
+  },
+  saveMaterial: async (material) => {
+    if (SCRIPT_URL === "여기에_URL_붙여넣기") return { success:true };
+    try {
+      const body = new URLSearchParams();
+      body.append("data", JSON.stringify({ action:"saveMaterial", material }));
+      await fetch(SCRIPT_URL, { method:"POST", body, mode:"no-cors" });
+    } catch(e) {}
+    return { success:true };
+  },
+  updateMaterial: async (id, material) => {
+    if (SCRIPT_URL === "여기에_URL_붙여넣기") return { success:true };
+    try {
+      const body = new URLSearchParams();
+      body.append("data", JSON.stringify({ action:"updateMaterial", id, material }));
+      await fetch(SCRIPT_URL, { method:"POST", body, mode:"no-cors" });
+    } catch(e) {}
+    return { success:true };
+  },
+  deleteMaterial: async (id) => {
+    if (SCRIPT_URL === "여기에_URL_붙여넣기") return { success:true };
+    try {
+      const body = new URLSearchParams();
+      body.append("data", JSON.stringify({ action:"deleteMaterial", id }));
+      await fetch(SCRIPT_URL, { method:"POST", body, mode:"no-cors" });
+    } catch(e) {}
+    return { success:true };
+  },
 };
 
 // ════════════════════════════════════════════════
@@ -235,8 +270,20 @@ export default function App() {
   });
   const [searchQuery, setSearchQuery] = useState("");
 
-  // 자재 목록
-  const [productList, setProductList] = useState([]);
+  // 자재 목록 (시트와 동기화 + localStorage 캐시)
+  const [productList, setProductList] = useState(()=>{
+    try {
+      const saved = localStorage.getItem("doorlock_materials");
+      return saved ? JSON.parse(saved) : [];
+    } catch(e) { return []; }
+  });
+  const setProductListPersist = (next) => {
+    setProductList(prev => {
+      const value = typeof next === "function" ? next(prev) : next;
+      try { localStorage.setItem("doorlock_materials", JSON.stringify(value)); } catch(e) {}
+      return value;
+    });
+  };
   const [showAddProduct, setShowAddProduct] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
   const [productForm, setProductForm] = useState({name:"",brand:"",type:"",price:"",cost:"",desc:"",note:""});
@@ -320,6 +367,29 @@ export default function App() {
 
   useEffect(() => { loadRecords(); }, [year, month]);
 
+  // ── 자재 목록을 시트에서 로드 (앱 시작 시 1번) ──
+  const loadMaterials = async () => {
+    if (SCRIPT_URL === "여기에_URL_붙여넣기") return;
+    try {
+      const data = await api.getMaterials();
+      if (Array.isArray(data) && data.length > 0) {
+        // 한국어 헤더 → 앱 내부 키로 변환
+        const mapped = data.map(m => ({
+          id:    m["ID"]    || m.id    || ("m_" + Date.now()),
+          brand: m["브랜드"] || m.brand || "-",
+          type:  m["종류"]   || m.type  || "기타",
+          name:  m["제품명"] || m.name  || "",
+          price: Number(m["소매가"] || m.price || 0),
+          cost:  Number(m["원가"]   || m.cost  || 0),
+          note:  m["비고"]   || m.note  || "",
+          fromSheet: true, // 시트에서 온 자재(삭제/수정 가능 표시)
+        }));
+        setProductListPersist(mapped);
+      }
+    } catch(e) { console.error("loadMaterials error:", e); }
+  };
+  useEffect(() => { loadMaterials(); }, []);
+
   // ── 로컬 레코드 (localStorage 영구 저장) ──
   const [localRecords, setLocalRecordsState] = useState(()=>{
     try {
@@ -336,6 +406,9 @@ export default function App() {
     });
   };
   const monthStr = `${year}-${String(month+1).padStart(2,"0")}`;
+  
+  // 통합 자재 목록: 시트(productList)가 우선, 비어있으면 코드 기본값(PRODUCTS) fallback
+  const allMaterials = productList.length > 0 ? productList : PRODUCTS;
   const sheetIds = new Set(records.map(r=>String(r.ID)));
   const mergedRecords = [
     ...records,
@@ -857,7 +930,7 @@ export default function App() {
 
         {/* ══════════ 자재 목록 탭 ══════════ */}
         {tab==="products" && (()=>{
-          const allProds = [...PRODUCTS, ...productList];
+          const allProds = allMaterials;
           const brands = ["전체", ...new Set(allProds.map(p=>p.brand))];
           const types  = ["전체", ...new Set(allProds.map(p=>p.type))];
           const filtered = allProds.filter(p=>
@@ -991,25 +1064,47 @@ export default function App() {
                 </div>
 
                 {productList.find(x=>x.id===selectedProd.id)&&(
-                  <button style={{
-                    width:"100%",marginTop:16,padding:"12px",borderRadius:12,border:"1px solid #fee2e2",
-                    background:"#fff",color:"#dc2626",fontFamily:"'Noto Sans KR',sans-serif",
-                    fontSize:13,fontWeight:700,cursor:"pointer"
-                  }} onClick={()=>{
-                    setProductList(l=>l.filter(x=>x.id!==selectedProd.id));
-                    setSelectedProd(null);
-                    showToast("🗑 삭제됐어요");
-                  }}>🗑 삭제</button>
+                  <div style={{display:"flex",gap:8,marginTop:16}}>
+                    <button style={{
+                      flex:1,padding:"12px",borderRadius:12,border:"1px solid #ddd",
+                      background:"#fff",color:"#111",fontFamily:"'Noto Sans KR',sans-serif",
+                      fontSize:13,fontWeight:700,cursor:"pointer"
+                    }} onClick={()=>{
+                      setProductForm({
+                        brand: selectedProd.brand||"",
+                        name:  selectedProd.name||"",
+                        type:  selectedProd.type||"",
+                        price: selectedProd.price||"",
+                        cost:  selectedProd.cost||"",
+                        note:  selectedProd.note||"",
+                        desc:  selectedProd.desc||"",
+                      });
+                      setEditProduct(selectedProd);
+                      setSelectedProd(null);
+                    }}>✏️ 수정</button>
+                    <button style={{
+                      flex:1,padding:"12px",borderRadius:12,border:"1px solid #fee2e2",
+                      background:"#fff",color:"#dc2626",fontFamily:"'Noto Sans KR',sans-serif",
+                      fontSize:13,fontWeight:700,cursor:"pointer"
+                    }} onClick={()=>{
+                      if (!confirm(`"${selectedProd.name}" 삭제할까요?`)) return;
+                      const id = selectedProd.id;
+                      setProductListPersist(l=>l.filter(x=>x.id!==id));
+                      if (SCRIPT_URL!=="여기에_URL_붙여넣기") api.deleteMaterial(id).catch(()=>{});
+                      setSelectedProd(null);
+                      showToast("🗑 삭제됐어요");
+                    }}>🗑 삭제</button>
+                  </div>
                 )}
               </div>
             </div>
           )}
 
-          {/* 자재 추가 모달 */}
-          {showAddProduct&&(
-            <div className="modal-bg" onClick={()=>setShowAddProduct(false)}>
+          {/* 자재 추가/수정 모달 */}
+          {(showAddProduct || editProduct) && (
+            <div className="modal-bg" onClick={()=>{ setShowAddProduct(false); setEditProduct(null); setProductForm({name:"",brand:"",type:"",price:"",cost:"",desc:"",note:""}); }}>
               <div className="modal" style={{maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
-                <h3 style={{marginBottom:16}}>📦 자재 추가</h3>
+                <h3 style={{marginBottom:16}}>{editProduct ? "✏️ 자재 수정" : "📦 자재 추가"}</h3>
                 {[
                   {key:"brand",label:"브랜드",    placeholder:"예) 락프로"},
                   {key:"name", label:"제품명",    placeholder:"예) H60N"},
@@ -1033,18 +1128,29 @@ export default function App() {
                   fontSize:14,fontWeight:700,cursor:"pointer"
                 }} onClick={()=>{
                   if(!productForm.name||!productForm.brand) return showToast("브랜드와 제품명을 입력하세요","error");
+                  const isEdit = !!editProduct;
+                  const id = isEdit ? editProduct.id : ("m_" + Date.now());
                   const newP = {
-                    id:"custom_"+Date.now(),
+                    id,
                     brand:productForm.brand, name:productForm.name,
                     type:productForm.type||"기타",
                     price:Number(productForm.price)||0,
                     cost:Number(productForm.cost)||0,
                     note:productForm.note||"", desc:productForm.desc||"",
+                    fromSheet: true,
                   };
-                  setProductList(l=>[...l,newP]);
+                  if (isEdit) {
+                    setProductListPersist(l => l.map(x => x.id===id ? newP : x));
+                    if (SCRIPT_URL!=="여기에_URL_붙여넣기") api.updateMaterial(id, newP).catch(()=>{});
+                  } else {
+                    setProductListPersist(l => [...l, newP]);
+                    if (SCRIPT_URL!=="여기에_URL_붙여넣기") api.saveMaterial(newP).catch(()=>{});
+                  }
                   setShowAddProduct(false);
-                  showToast("✅ 자재 추가됐어요!");
-                }}>추가</button>
+                  setEditProduct(null);
+                  setProductForm({name:"",brand:"",type:"",price:"",cost:"",desc:"",note:""});
+                  showToast(isEdit ? "✅ 자재 수정됐어요!" : "✅ 자재 추가됐어요!");
+                }}>{editProduct ? "수정" : "추가"}</button>
               </div>
             </div>
           )}
@@ -1860,7 +1966,7 @@ export default function App() {
           const subTotal  = travelFee+(needOpen?openTotal:0)+(needInstall?prodTotal:0);
           const costTotal = (af.products||[]).reduce((a,p)=>a+p.cost*(p.qty||1),0);
           const myE       = isSoomgo ? subTotal-costTotal : Math.round((subTotal-costTotal)*0.5);
-          const filteredP = (af.productFilter||"전체")==="전체" ? PRODUCTS : PRODUCTS.filter(p=>p.type===af.productFilter);
+          const filteredP = (af.productFilter||"전체")==="전체" ? allMaterials : allMaterials.filter(p=>p.type===af.productFilter);
           const fmtTime = v => { const d=v.replace(/\D/g,"").slice(0,4); return d.length>=3?d.slice(0,2)+":"+d.slice(2):d; };
 
           return (
@@ -2046,7 +2152,7 @@ function FinalQuoteView({ fnq, setFnq, onSave, onBack, showToast, isManual, sele
   const myEarnings   = fnqIsSoomgo ? finalTotal-totalCost : Math.round((finalTotal-totalCost)*0.5);
 
   const typeOpts = ["전체","보조키","주키","푸쉬풀","강화유리","기타"];
-  const filteredProducts = f.filterType==="전체" ? PRODUCTS : PRODUCTS.filter(p=>p.type===f.filterType);
+  const filteredProducts = f.filterType==="전체" ? allMaterials : allMaterials.filter(p=>p.type===f.filterType);
 
   const toggleOpen = (t) => {
     const exists = f.openItems.find(x=>x.id===t.id);
