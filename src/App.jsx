@@ -102,8 +102,14 @@ const TRAVEL_FEE = 30000;
 const TRAVEL_FEE_SOOMGO = 10000;
 
 // 숨고 가격 계산
-const soomgoPrice = (price) => Math.floor(price * 0.7 / 10000) * 10000;
-const soomgoOpen  = (price) => Math.floor(price * 0.5 / 10000) * 10000;
+const soomgoPrice = (price) => {
+  if (!price || price < 10000) return Math.floor((price||0) * 0.7);
+  return Math.floor(price * 0.7 / 10000) * 10000;
+};
+const soomgoOpen  = (price) => {
+  if (!price || price < 10000) return Math.floor((price||0) * 0.5);
+  return Math.floor(price * 0.5 / 10000) * 10000;
+};
 const WORK_TYPES = [
   { id:"open",    label:"개문" },
   { id:"install", label:"단순설치" },
@@ -383,9 +389,16 @@ export default function App() {
         총금액: Number(r["총금액"]||0),
         준형수령액: Number(r["준형수령액"]||0),
         자재원가: Number(r["자재원가"]||0),
+        할인금액: Number(r["할인금액"]||0),
         현장메모: r["현장메모"]||"",
+        취소사유: r["취소사유"]||"",
         결제방법: r["결제방법"]||"",
+        영수증: r["영수증"]||"",
         결제완료: r["결제완료"]===true || r["결제완료"]==="TRUE" || r["결제완료"]==="true",
+        부가세: Number(r["부가세"]||0),
+        개문금액: Number(r["개문금액"]||0),
+        설치금액: Number(r["설치금액"]||0),
+        출장비: Number(r["출장비"]||30000),
       }));
       setAllTimeRecords(allMapped);
     } catch(e) {
@@ -496,13 +509,25 @@ export default function App() {
   // ── 최초 견적서 저장 ──
   const saveFirstQuote = (status="견적대기") => {
     if (saving) return; // 더블클릭 방지
+    
+    // 입력 검증
+    if (!fq.channel) { showToast("채널을 선택해주세요","error"); return; }
+    if (!fq.workType) { showToast("작업 유형을 선택해주세요","error"); return; }
+    if (status==="예약" && !fq.reserveDate) { showToast("예약 날짜를 선택해주세요","error"); return; }
+    
     setSaving(true);
+    const isSoomgoQuote = fq.channel?.id === "soomgo";
+    const travelFee   = fq.noTravel ? 0 : (isSoomgoQuote ? TRAVEL_FEE_SOOMGO : TRAVEL_FEE);
     const needOpen    = fq.workType?.id==="open"    || fq.workType?.id==="both";
     const needInstall = fq.workType?.id==="install" || fq.workType?.id==="both";
-    const openTotal   = fq.openItems.reduce((a,i)=>a+(i.actual||0)*i.qty, 0);
-    const installPrice= needInstall&&fq.installItems.reduce((a,i)=>a+i.base*i.qty,0);
+    const openTotal   = fq.openItems.reduce((a,i)=>a+(isSoomgoQuote ? soomgoOpen(i.actual||0) : (i.actual||0))*i.qty, 0);
+    const installPrice= needInstall ? fq.installItems.reduce((a,i)=>{
+      if (i.id === "etc") return a + (i.etcPrice||0);
+      const base = isSoomgoQuote && i.base>0 ? soomgoPrice(i.base) : i.base;
+      return a + base * i.qty;
+    }, 0) : 0;
     const surTotal    = fq.surcharges.reduce((a,s)=>a+s.amount, 0);
-    const total       = TRAVEL_FEE+(needOpen?openTotal:0)+installPrice+surTotal;
+    const total       = travelFee+(needOpen?openTotal:0)+installPrice+surTotal;
     const id          = Date.now().toString();
     const isReserve   = status==="예약" && fq.reserveDate;
     const record = {
@@ -607,7 +632,7 @@ export default function App() {
         할증내역: breakdown.할증내역||"",
         할증금액: breakdown.할증금액||0,
         결제방법: breakdown.결제방법||"",
-        출장비: breakdown.출장비||TRAVEL_FEE,
+        출장비: breakdown.출장비 || (fnq.channel?.id==="soomgo" ? TRAVEL_FEE_SOOMGO : TRAVEL_FEE),
       };
       // localRecords + records 즉시 업데이트
       setLocalRecords(p=>p.map(r=>String(r.ID)===String(fnq.recordId)?{...r,...fields}:r));
@@ -628,10 +653,8 @@ export default function App() {
         @keyframes spin { to { transform: rotate(360deg); } }
         *{box-sizing:border-box;margin:0;padding:0;}
         body{background:#f4f4f2;font-family:'Noto Sans KR',sans-serif;}
-        .app{min-height:100vh;max-width:420px;margin:0 auto;padding-bottom:100px;}
-
-        /* 탭바 */
-        .tab-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:420px;background:#fff;border-top:1px solid #eee;display:flex;padding:8px 0 20px;z-index:100;}
+        .app{min-height:100vh;max-width:420px;margin:0 auto;padding-bottom:calc(100px + env(safe-area-inset-bottom, 0px));}
+        .tab-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:420px;background:#fff;border-top:1px solid #eee;display:flex;padding:8px 0 calc(20px + env(safe-area-inset-bottom, 0px));z-index:100;}
         .tab-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:6px 0;}
         .tab-icon{font-size:20px;}
         .tab-label{font-size:10px;font-weight:700;color:#ccc;}
@@ -657,11 +680,11 @@ export default function App() {
         .ch-btn.soomgo.on{border-color:#16a34a;background:#f0fdf4;color:#15803d;}
 
         /* 입력 */
-        .input-field{width:100%;border:1.5px solid #ebebeb;border-radius:11px;padding:11px 13px;font-family:'Noto Sans KR',sans-serif;font-size:14px;color:#333;outline:none;transition:border-color .15s;}
+        .input-field{width:100%;border:1.5px solid #ebebeb;border-radius:11px;padding:11px 13px;font-family:'Noto Sans KR',sans-serif;font-size:16px;color:#333;outline:none;transition:border-color .15s;}
         .input-field:focus{border-color:#111;}
         .input-field::placeholder{color:#ddd;}
         .input-gap{display:flex;flex-direction:column;gap:10px;}
-        .memo-input{width:100%;border:1.5px solid #ebebeb;border-radius:11px;padding:11px 13px;font-family:'Noto Sans KR',sans-serif;font-size:13px;color:#333;resize:none;outline:none;min-height:64px;transition:border-color .15s;}
+        .memo-input{width:100%;border:1.5px solid #ebebeb;border-radius:11px;padding:11px 13px;font-family:'Noto Sans KR',sans-serif;font-size:16px;color:#333;resize:none;outline:none;min-height:64px;transition:border-color .15s;}
         .memo-input:focus{border-color:#111;}
         .memo-input::placeholder{color:#ddd;}
 
@@ -840,9 +863,9 @@ export default function App() {
               </div>
               <div style={{display:"flex",alignItems:"center",gap:10}}>
                 <button onClick={()=>loadRecords()} disabled={loading} style={{
-                  padding:"6px 10px",borderRadius:8,border:"1px solid rgba(255,255,255,.2)",
-                  background:"rgba(255,255,255,.08)",color:"#fff",fontSize:14,cursor:"pointer",
-                  opacity:loading?0.4:1
+                  padding:"10px 14px",borderRadius:10,border:"1px solid rgba(255,255,255,.2)",
+                  background:"rgba(255,255,255,.08)",color:"#fff",fontSize:18,cursor:"pointer",
+                  opacity:loading?0.4:1,minWidth:44,minHeight:44
                 }} title="시트에서 다시 불러오기">
                   <span style={{display:"inline-block",animation:loading?"spin 0.8s linear infinite":"none"}}>⟲</span>
                 </button>
@@ -1231,7 +1254,7 @@ export default function App() {
                             if (!confirm(`"${selectedProd.name}" 삭제할까요?`)) return;
                             const id = selectedProd.id;
                             setProductListPersist(l=>l.filter(x=>x.id!==id));
-                            if (SCRIPT_URL!=="여기에_URL_붙여넣기") api.deleteMaterial(id).catch(()=>{});
+                            if (SCRIPT_URL!=="여기에_URL_붙여넣기") { api.deleteMaterial(id).catch(()=>{}); setTimeout(()=>loadMaterials(), 1500); }
                             setSelectedProd(null);
                             showToast("🗑 삭제됐어요");
                           }}>🗑 삭제</button>
@@ -1302,7 +1325,7 @@ export default function App() {
                           if (!confirm(`"${selectedProd.name}" 삭제할까요?`)) return;
                           const id = selectedProd.id;
                           setProductListPersist(l=>l.filter(x=>x.id!==id));
-                          if (SCRIPT_URL!=="여기에_URL_붙여넣기") api.deleteMaterial(id).catch(()=>{});
+                          if (SCRIPT_URL!=="여기에_URL_붙여넣기") { api.deleteMaterial(id).catch(()=>{}); setTimeout(()=>loadMaterials(), 1500); }
                           setSelectedProd(null);
                           showToast("🗑 삭제됐어요");
                         }}>🗑 삭제</button>
@@ -1370,10 +1393,16 @@ export default function App() {
                   };
                   if (isEdit) {
                     setProductListPersist(l => l.map(x => x.id===id ? newP : x));
-                    if (SCRIPT_URL!=="여기에_URL_붙여넣기") api.updateMaterial(id, newP).catch(()=>{});
+                    if (SCRIPT_URL!=="여기에_URL_붙여넣기") {
+                      api.updateMaterial(id, newP).catch(()=>{});
+                      setTimeout(() => loadMaterials(), 1500);
+                    }
                   } else {
                     setProductListPersist(l => [...l, newP]);
-                    if (SCRIPT_URL!=="여기에_URL_붙여넣기") api.saveMaterial(newP).catch(()=>{});
+                    if (SCRIPT_URL!=="여기에_URL_붙여넣기") {
+                      api.saveMaterial(newP).catch(()=>{});
+                      setTimeout(() => loadMaterials(), 1500);
+                    }
                   }
                   setShowAddProduct(false);
                   setEditProduct(null);
@@ -1393,7 +1422,10 @@ export default function App() {
           </div>
           <div style={{padding:"0 16px"}}>
             {(()=>{
-              const allRecs = [...(SCRIPT_URL==="여기에_URL_붙여넣기"?[]:records), ...localRecords.filter(r=>!records.find(s=>String(s.ID)===String(r.ID)))];
+              // 대기/예약/출동중/작업중은 모든 월에서 가져옴
+              const sourceRecs = SCRIPT_URL==="여기에_URL_붙여넣기" ? [] : (allTimeRecords.length>0 ? allTimeRecords : records);
+              const allIds = new Set(sourceRecs.map(r=>String(r.ID)));
+              const allRecs = [...sourceRecs, ...localRecords.filter(r=>!allIds.has(String(r.ID)))];
               const pending = allRecs
                 .filter(r=>["견적대기","예약","출동중","작업중"].includes(r.상태))
                 .sort((a,b)=>{
@@ -1880,7 +1912,7 @@ export default function App() {
                 <div style={{display:"flex",flexDirection:"column"}}>
                   <div style={{display:"flex",justifyContent:"space-between",padding:"9px 0",borderBottom:"1px solid #f5f5f5"}}>
                     <span style={{fontSize:13,color:"#555"}}>출장비</span>
-                    <span style={{fontSize:13,fontWeight:700}}>{fmt(Number(viewRecord.출장비||TRAVEL_FEE))}원</span>
+                    <span style={{fontSize:13,fontWeight:700}}>{fmt(Number(viewRecord.출장비 || (viewRecord.채널==="soomgo"?TRAVEL_FEE_SOOMGO:TRAVEL_FEE)))}원</span>
                   </div>
                   {viewRecord.개문내역&&Number(viewRecord.개문금액||0)>0&&(
                     <div style={{display:"flex",justifyContent:"space-between",padding:"9px 0",borderBottom:"1px solid #f5f5f5"}}>
