@@ -192,19 +192,25 @@ const api = {
   },
   save: async (record) => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return { success:true };
-    try {
-      // JSONP 방식 (응답 확인 가능)
-      const url = `${SCRIPT_URL}?action=save&data=${encodeURIComponent(JSON.stringify(record))}&_=${Date.now()}`;
-      const result = await fetchGAS(url);
-      return result || { success:true };
-    } catch(e) {
-      // JSONP 실패 시 POST 시도
+    const url = `${SCRIPT_URL}?action=save&data=${encodeURIComponent(JSON.stringify(record))}&_=${Date.now()}`;
+    // 최대 3회 재시도
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        const body = new URLSearchParams();
-        body.append("data", JSON.stringify({ action:"save", record }));
-        await fetch(SCRIPT_URL, { method:"POST", body, mode:"no-cors" });
-      } catch(e2) {}
-      return { success:false, error: e.message };
+        const result = await fetchGAS(url);
+        if (result && !result.error) return result;
+        if (attempt === 2) return result || { success:false, error:"unknown" };
+      } catch(e) {
+        if (attempt === 2) {
+          // 마지막 시도 실패 → POST fallback
+          try {
+            const body = new URLSearchParams();
+            body.append("data", JSON.stringify({ action:"save", record }));
+            await fetch(SCRIPT_URL, { method:"POST", body, mode:"no-cors" });
+          } catch(e2) {}
+          return { success:false, error: e.message };
+        }
+      }
+      await new Promise(r=>setTimeout(r, 500 * (attempt+1))); // 0.5s, 1s 대기
     }
   },
   update: async (id, fields) => {
@@ -2006,10 +2012,46 @@ export default function App() {
             <div className="modal" style={{maxHeight:"90vh",overflowY:"auto",padding:0,borderRadius:"20px 20px 0 0"}} onClick={e=>e.stopPropagation()}>
               {/* 견적 카드 */}
               <div style={{background:"#111",padding:"22px 22px 18px"}}>
-                <div style={{display:"inline-block",background:"rgba(255,255,255,.1)",color:"rgba(255,255,255,.6)",fontSize:10,fontWeight:700,letterSpacing:2,padding:"4px 10px",borderRadius:20,marginBottom:12}}>최종 견적서 · FINAL</div>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+                  <div style={{display:"inline-block",background:"rgba(255,255,255,.1)",color:"rgba(255,255,255,.6)",fontSize:10,fontWeight:700,letterSpacing:2,padding:"4px 10px",borderRadius:20}}>최종 견적서 · FINAL</div>
+                  <button style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.2)",color:"#fff",borderRadius:20,padding:"4px 10px",fontSize:11,cursor:"pointer"}}
+                    onClick={()=>setViewRecord(v=>({...v,_editingInfo: !v._editingInfo}))}>
+                    {viewRecord._editingInfo ? "✓ 완료" : "✏️ 정보수정"}
+                  </button>
+                </div>
                 <div style={{color:"#fff",fontSize:18,fontWeight:900,letterSpacing:"-.5px",marginBottom:8}}>도어락 · 열쇠 전문 출장</div>
-                {viewRecord.연락처&&<div style={{color:"rgba(255,255,255,.5)",fontSize:12,marginBottom:2}}>{viewRecord.연락처}</div>}
-                {viewRecord.주소&&<div style={{color:"rgba(255,255,255,.5)",fontSize:12}}>📍 {viewRecord.주소}</div>}
+                {viewRecord._editingInfo ? (
+                  <div style={{display:"flex",flexDirection:"column",gap:6}}>
+                    <input value={viewRecord.연락처||""} placeholder="연락처"
+                      onChange={e=>setViewRecord(v=>({...v,연락처:formatPhone(e.target.value)}))}
+                      style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.2)",borderRadius:8,padding:"8px 10px",color:"#fff",fontSize:13,fontFamily:"'Noto Sans KR',sans-serif",outline:"none"}}/>
+                    <input value={viewRecord.주소||""} placeholder="주소"
+                      onChange={e=>setViewRecord(v=>({...v,주소:e.target.value}))}
+                      style={{background:"rgba(255,255,255,.1)",border:"1px solid rgba(255,255,255,.2)",borderRadius:8,padding:"8px 10px",color:"#fff",fontSize:13,fontFamily:"'Noto Sans KR',sans-serif",outline:"none"}}/>
+                    <button style={{background:"#16a34a",border:"none",color:"#fff",borderRadius:8,padding:"8px",fontSize:12,fontWeight:700,fontFamily:"'Noto Sans KR',sans-serif",cursor:"pointer",marginTop:4}}
+                      onClick={()=>{
+                        const id = viewRecord.ID;
+                        const fields = { 연락처: viewRecord.연락처||"", 주소: viewRecord.주소||"" };
+                        // 즉시 반영
+                        setLocalRecords(p=>p.map(r=>String(r.ID)===String(id)?{...r,...fields}:r));
+                        setRecords(p=>p.map(r=>String(r.ID)===String(id)?{...r,...fields}:r));
+                        setAllTimeRecords(p=>p.map(r=>String(r.ID)===String(id)?{...r,...fields}:r));
+                        // 시트 동기화
+                        if(SCRIPT_URL!=="여기에_URL_붙여넣기") {
+                          api.update(id, fields).then(res=>{
+                            if(res && res.error) showToast("⚠️ 시트 저장 실패: "+res.error,"error");
+                            else showToast("✅ 정보 저장됨");
+                          }).catch(()=>showToast("⚠️ 시트 저장 실패","error"));
+                        }
+                        setViewRecord(v=>({...v,_editingInfo:false}));
+                      }}>저장</button>
+                  </div>
+                ) : (
+                  <>
+                    {viewRecord.연락처&&<div style={{color:"rgba(255,255,255,.5)",fontSize:12,marginBottom:2}}>{viewRecord.연락처}</div>}
+                    {viewRecord.주소&&<div style={{color:"rgba(255,255,255,.5)",fontSize:12}}>📍 {viewRecord.주소}</div>}
+                  </>
+                )}
               </div>
 
               <div style={{background:"#fff",padding:"20px 22px"}}>
@@ -2333,8 +2375,14 @@ export default function App() {
           const needOpen = af.workType==="개문"||af.workType==="개문+설치";
           const needInstall = af.workType==="단순설치"||af.workType==="개문+설치";
           const travelFee = af.noTravel ? 0 : (isSoomgo ? TRAVEL_FEE_SOOMGO : TRAVEL_FEE);
-          const openTotal = (af.openItems||[]).reduce((a,i)=>a+(isSoomgo?soomgoOpen(i.actual):i.actual)*i.qty,0);
-          const prodTotal = (af.products||[]).reduce((a,p)=>a+(isSoomgo?soomgoPrice(p.price):p.price)*(p.qty||1),0);
+          const openTotal = (af.openItems||[]).reduce((a,i)=>{
+            const base = i.customPrice != null && i.customPrice !== "" ? Number(i.customPrice) : (isSoomgo?soomgoOpen(i.actual):i.actual);
+            return a + base * (i.qty||1);
+          },0);
+          const prodTotal = (af.products||[]).reduce((a,p)=>{
+            const base = p.customPrice != null && p.customPrice !== "" ? Number(p.customPrice) : (isSoomgo?soomgoPrice(p.price):p.price);
+            return a + base * (p.qty||1);
+          },0);
           const subTotal  = travelFee+(needOpen?openTotal:0)+(needInstall?prodTotal:0);
           const costTotal = (af.products||[]).reduce((a,p)=>a+p.cost*(p.qty||1),0);
           const myE       = isSoomgo ? subTotal-costTotal : Math.round((subTotal-costTotal)*0.5);
@@ -2386,11 +2434,82 @@ export default function App() {
                 </div>
                 {needOpen&&<div style={{marginTop:8}}>
                   <div style={{fontSize:11,color:"#aaa",fontWeight:700,letterSpacing:2,marginBottom:8}}>개문 유형 (중복 선택)</div>
-                  {OPEN_TYPES.map(t=>{const sel=(af.openItems||[]).find(x=>x.id===t.id);const price=isSoomgo?soomgoOpen(t.actual):t.actual;return(<div key={t.id}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",borderRadius:10,marginBottom:6,cursor:"pointer",border:"1.5px solid",borderColor:sel?"#111":"#eee",background:sel?"#111":"#fff"}} onClick={()=>setAddForm(f=>{const cur=f.openItems||[];return{...f,openItems:cur.find(x=>x.id===t.id)?cur.filter(x=>x.id!==t.id):[...cur,{...t,qty:1}]};})}><span style={{fontSize:13,fontWeight:700,color:sel?"#fff":"#111"}}>{t.label}</span><span style={{fontSize:12,color:sel?"rgba(255,255,255,.6)":"#aaa"}}>{fmt(price)}원~</span></div>{sel&&<div className="qty-row" style={{marginBottom:8,paddingLeft:4}}><label style={{fontSize:12,color:"#888"}}>수량</label><div className="qty-ctrl"><button className="qty-btn" onClick={()=>setAddForm(f=>({...f,openItems:f.openItems.map(x=>x.id===t.id?{...x,qty:Math.max(1,x.qty-1)}:x)}))}>−</button><div className="qty-num">{sel.qty}</div><button className="qty-btn" onClick={()=>setAddForm(f=>({...f,openItems:f.openItems.map(x=>x.id===t.id?{...x,qty:x.qty+1}:x)}))}>＋</button></div><span style={{fontSize:12,color:"#aaa"}}>{fmt(price*sel.qty)}원</span></div>}</div>);})}</div>}
+                  {OPEN_TYPES.map(t=>{
+                    const sel=(af.openItems||[]).find(x=>x.id===t.id);
+                    const defaultPrice = isSoomgo?soomgoOpen(t.actual):t.actual;
+                    const currentPrice = sel ? (sel.customPrice != null && sel.customPrice !== "" ? Number(sel.customPrice) : defaultPrice) : defaultPrice;
+                    return(
+                    <div key={t.id}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",borderRadius:10,marginBottom:6,cursor:"pointer",border:"1.5px solid",borderColor:sel?"#111":"#eee",background:sel?"#111":"#fff"}} onClick={()=>setAddForm(f=>{const cur=f.openItems||[];return{...f,openItems:cur.find(x=>x.id===t.id)?cur.filter(x=>x.id!==t.id):[...cur,{...t,qty:1,customPrice:""}]};})}>
+                        <span style={{fontSize:13,fontWeight:700,color:sel?"#fff":"#111"}}>{t.label}</span>
+                        <span style={{fontSize:12,color:sel?"rgba(255,255,255,.6)":"#aaa"}}>{fmt(defaultPrice)}원~</span>
+                      </div>
+                      {sel&&(
+                        <div style={{paddingLeft:4,marginBottom:8}}>
+                          <div className="qty-row">
+                            <label style={{fontSize:12,color:"#888"}}>수량</label>
+                            <div className="qty-ctrl">
+                              <button className="qty-btn" onClick={()=>setAddForm(f=>({...f,openItems:f.openItems.map(x=>x.id===t.id?{...x,qty:Math.max(1,x.qty-1)}:x)}))}>−</button>
+                              <div className="qty-num">{sel.qty}</div>
+                              <button className="qty-btn" onClick={()=>setAddForm(f=>({...f,openItems:f.openItems.map(x=>x.id===t.id?{...x,qty:x.qty+1}:x)}))}>＋</button>
+                            </div>
+                            <span style={{fontSize:12,color:"#aaa"}}>{fmt(currentPrice*sel.qty)}원</span>
+                          </div>
+                          <div style={{display:"flex",alignItems:"center",gap:6,marginTop:6}}>
+                            <label style={{fontSize:11,color:"#888",minWidth:48}}>개당가</label>
+                            <input type="number" placeholder={String(defaultPrice)}
+                              value={sel.customPrice||""}
+                              onChange={e=>setAddForm(f=>({...f,openItems:f.openItems.map(x=>x.id===t.id?{...x,customPrice:e.target.value}:x)}))}
+                              style={{flex:1,padding:"6px 10px",borderRadius:8,border:"1px solid #ddd",fontSize:13,fontFamily:"'Noto Sans KR',sans-serif",outline:"none"}} />
+                            <span style={{fontSize:11,color:"#aaa"}}>원</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    );
+                  })}
+                </div>}
                 {needInstall&&<div style={{marginTop:needOpen?14:0}}>
                   <div style={{fontSize:11,color:"#aaa",fontWeight:700,letterSpacing:2,marginBottom:8}}>제품 선택 (중복 가능)</div>
                   <div style={{display:"flex",gap:6,flexWrap:"wrap",marginBottom:10}}>{["전체","보조키","주키","푸쉬풀","강화유리","기타"].map(t=>(<button key={t} style={{padding:"5px 12px",borderRadius:20,border:"1.5px solid",borderColor:(af.productFilter||"전체")===t?"#2563eb":"#eee",background:(af.productFilter||"전체")===t?"#eff6ff":"#fff",color:(af.productFilter||"전체")===t?"#2563eb":"#888",fontFamily:"'Noto Sans KR',sans-serif",fontSize:11,fontWeight:700,cursor:"pointer"}} onClick={()=>setAddForm(f=>({...f,productFilter:t}))}>{t}</button>))}</div>
-                  <div style={{maxHeight:180,overflowY:"auto",display:"flex",flexDirection:"column",gap:6}}>{filteredP.map(p=>{const price=isSoomgo?soomgoPrice(p.price):p.price;const sel=(af.products||[]).find(x=>x.id===p.id);return(<div key={p.id}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",borderRadius:10,cursor:"pointer",border:"1.5px solid",borderColor:sel?"#111":"#eee",background:sel?"#111":"#fff"}} onClick={()=>setAddForm(f=>{const cur=f.products||[];return{...f,products:cur.find(x=>x.id===p.id)?cur.filter(x=>x.id!==p.id):[...cur,{...p,qty:1}]};})}><div><div style={{fontSize:13,fontWeight:700,color:sel?"#fff":"#111"}}>{p.brand} {p.name}</div><div style={{fontSize:11,color:sel?"rgba(255,255,255,.5)":"#aaa"}}>{p.type}</div></div><span style={{fontSize:13,fontWeight:700,color:sel?"#fff":"#111"}}>{fmt(price)}원</span></div>{sel&&<div className="qty-row" style={{marginTop:4,marginBottom:4,paddingLeft:4}}><label style={{fontSize:12,color:"#888"}}>수량</label><div className="qty-ctrl"><button className="qty-btn" onClick={()=>setAddForm(f=>({...f,products:f.products.map(x=>x.id===p.id?{...x,qty:Math.max(1,(x.qty||1)-1)}:x)}))}>−</button><div className="qty-num">{sel.qty||1}</div><button className="qty-btn" onClick={()=>setAddForm(f=>({...f,products:f.products.map(x=>x.id===p.id?{...x,qty:(x.qty||1)+1}:x)}))}>＋</button></div><span style={{fontSize:12,color:"#aaa"}}>{fmt(price*(sel.qty||1))}원</span><button style={{marginLeft:"auto",background:"#fee2e2",border:"none",borderRadius:20,padding:"3px 10px",fontSize:11,color:"#dc2626",fontWeight:700,cursor:"pointer"}} onClick={()=>setAddForm(f=>({...f,products:f.products.filter(x=>x.id!==p.id)}))}>✕</button></div>}</div>);})}</div>
+                  <div style={{maxHeight:180,overflowY:"auto",display:"flex",flexDirection:"column",gap:6}}>{filteredP.map(p=>{
+                    const defaultPrice=isSoomgo?soomgoPrice(p.price):p.price;
+                    const sel=(af.products||[]).find(x=>x.id===p.id);
+                    const currentPrice = sel ? (sel.customPrice != null && sel.customPrice !== "" ? Number(sel.customPrice) : defaultPrice) : defaultPrice;
+                    return(
+                    <div key={p.id}>
+                      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 12px",borderRadius:10,cursor:"pointer",border:"1.5px solid",borderColor:sel?"#111":"#eee",background:sel?"#111":"#fff"}} onClick={()=>setAddForm(f=>{const cur=f.products||[];return{...f,products:cur.find(x=>x.id===p.id)?cur.filter(x=>x.id!==p.id):[...cur,{...p,qty:1,customPrice:""}]};})}>
+                        <div>
+                          <div style={{fontSize:13,fontWeight:700,color:sel?"#fff":"#111"}}>{p.brand} {p.name}</div>
+                          <div style={{fontSize:11,color:sel?"rgba(255,255,255,.5)":"#aaa"}}>{p.type}</div>
+                        </div>
+                        <span style={{fontSize:13,fontWeight:700,color:sel?"#fff":"#111"}}>{fmt(defaultPrice)}원</span>
+                      </div>
+                      {sel&&(
+                        <div style={{paddingLeft:4,marginTop:4,marginBottom:6}}>
+                          <div className="qty-row">
+                            <label style={{fontSize:12,color:"#888"}}>수량</label>
+                            <div className="qty-ctrl">
+                              <button className="qty-btn" onClick={()=>setAddForm(f=>({...f,products:f.products.map(x=>x.id===p.id?{...x,qty:Math.max(1,(x.qty||1)-1)}:x)}))}>−</button>
+                              <div className="qty-num">{sel.qty||1}</div>
+                              <button className="qty-btn" onClick={()=>setAddForm(f=>({...f,products:f.products.map(x=>x.id===p.id?{...x,qty:(x.qty||1)+1}:x)}))}>＋</button>
+                            </div>
+                            <span style={{fontSize:12,color:"#aaa"}}>{fmt(currentPrice*(sel.qty||1))}원</span>
+                            <button style={{marginLeft:"auto",background:"#fee2e2",border:"none",borderRadius:20,padding:"3px 10px",fontSize:11,color:"#dc2626",fontWeight:700,cursor:"pointer"}} onClick={()=>setAddForm(f=>({...f,products:f.products.filter(x=>x.id!==p.id)}))}>✕</button>
+                          </div>
+                          <div style={{display:"flex",alignItems:"center",gap:6,marginTop:6}}>
+                            <label style={{fontSize:11,color:"#888",minWidth:48}}>개당가</label>
+                            <input type="number" placeholder={String(defaultPrice)}
+                              value={sel.customPrice||""}
+                              onChange={e=>setAddForm(f=>({...f,products:f.products.map(x=>x.id===p.id?{...x,customPrice:e.target.value}:x)}))}
+                              style={{flex:1,padding:"6px 10px",borderRadius:8,border:"1px solid #ddd",fontSize:13,fontFamily:"'Noto Sans KR',sans-serif",outline:"none"}} />
+                            <span style={{fontSize:11,color:"#aaa"}}>원</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    );
+                  })}</div>
                 </div>}
               </div>
 
@@ -2418,8 +2537,14 @@ export default function App() {
                 <div className="ptitle">금액 정산 (자동)</div>
                 <div style={{display:"flex",flexDirection:"column",gap:6,marginBottom:12}}>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"#888"}}><span>출장비</span><span style={{fontWeight:700}}>{fmt(travelFee)}원</span></div>
-                  {needOpen&&(af.openItems||[]).map(i=>(<div key={i.id} style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"#888"}}><span>{i.label}{i.qty>1?` ×${i.qty}`:""}</span><span style={{fontWeight:700}}>{fmt((isSoomgo?soomgoOpen(i.actual):i.actual)*i.qty)}원</span></div>))}
-                  {needInstall&&(af.products||[]).map(p=>(<div key={p.id} style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"#888"}}><span>{p.brand} {p.name}{(p.qty||1)>1?` ×${p.qty||1}`:""}</span><span style={{fontWeight:700}}>{fmt((isSoomgo?soomgoPrice(p.price):p.price)*(p.qty||1))}원</span></div>))}
+                  {needOpen&&(af.openItems||[]).map(i=>{
+                    const price = i.customPrice != null && i.customPrice !== "" ? Number(i.customPrice) : (isSoomgo?soomgoOpen(i.actual):i.actual);
+                    return (<div key={i.id} style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"#888"}}><span>{i.label}{i.qty>1?` ×${i.qty}`:""}</span><span style={{fontWeight:700}}>{fmt(price*i.qty)}원</span></div>);
+                  })}
+                  {needInstall&&(af.products||[]).map(p=>{
+                    const price = p.customPrice != null && p.customPrice !== "" ? Number(p.customPrice) : (isSoomgo?soomgoPrice(p.price):p.price);
+                    return (<div key={p.id} style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"#888"}}><span>{p.brand} {p.name}{(p.qty||1)>1?` ×${p.qty||1}`:""}</span><span style={{fontWeight:700}}>{fmt(price*(p.qty||1))}원</span></div>);
+                  })}
                   <div style={{height:1,background:"#eee",margin:"4px 0"}}/>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:15,fontWeight:900,color:"#111"}}><span>합계</span><span>{fmt(subTotal)}원</span></div>
                 </div>
