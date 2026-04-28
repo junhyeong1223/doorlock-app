@@ -193,29 +193,49 @@ const api = {
   save: async (record) => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return { success:true };
     try {
-      const body = new URLSearchParams();
-      body.append("data", JSON.stringify({ action:"save", record }));
-      await fetch(SCRIPT_URL, { method:"POST", body, mode:"no-cors" });
-    } catch(e) {}
-    return { success:true };
+      // JSONP 방식 (응답 확인 가능)
+      const url = `${SCRIPT_URL}?action=save&data=${encodeURIComponent(JSON.stringify(record))}&_=${Date.now()}`;
+      const result = await fetchGAS(url);
+      return result || { success:true };
+    } catch(e) {
+      // JSONP 실패 시 POST 시도
+      try {
+        const body = new URLSearchParams();
+        body.append("data", JSON.stringify({ action:"save", record }));
+        await fetch(SCRIPT_URL, { method:"POST", body, mode:"no-cors" });
+      } catch(e2) {}
+      return { success:false, error: e.message };
+    }
   },
   update: async (id, fields) => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return { success:true };
     try {
-      const body = new URLSearchParams();
-      body.append("data", JSON.stringify({ action:"update", id, fields }));
-      await fetch(SCRIPT_URL, { method:"POST", body, mode:"no-cors" });
-    } catch(e) {}
-    return { success:true };
+      const url = `${SCRIPT_URL}?action=update&id=${encodeURIComponent(id)}&fields=${encodeURIComponent(JSON.stringify(fields))}&_=${Date.now()}`;
+      const result = await fetchGAS(url);
+      return result || { success:true };
+    } catch(e) {
+      try {
+        const body = new URLSearchParams();
+        body.append("data", JSON.stringify({ action:"update", id, fields }));
+        await fetch(SCRIPT_URL, { method:"POST", body, mode:"no-cors" });
+      } catch(e2) {}
+      return { success:false, error: e.message };
+    }
   },
   delete: async (id) => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return { success:true };
     try {
-      const body = new URLSearchParams();
-      body.append("data", JSON.stringify({ action:"delete", id }));
-      await fetch(SCRIPT_URL, { method:"POST", body, mode:"no-cors" });
-    } catch(e) {}
-    return { success:true };
+      const url = `${SCRIPT_URL}?action=delete&id=${encodeURIComponent(id)}&_=${Date.now()}`;
+      const result = await fetchGAS(url);
+      return result || { success:true };
+    } catch(e) {
+      try {
+        const body = new URLSearchParams();
+        body.append("data", JSON.stringify({ action:"delete", id }));
+        await fetch(SCRIPT_URL, { method:"POST", body, mode:"no-cors" });
+      } catch(e2) {}
+      return { success:false, error: e.message };
+    }
   },
   // ─── 자재 관리 ───
   getMaterials: async () => {
@@ -317,7 +337,7 @@ export default function App() {
     channel:"office", time:"", workType:"",
     openItems:[], products:[], productFilter:"전체",
     note:"", status:"완료", phone:"", address:"",
-    noTravel:false,
+    noTravel:false, customTotal:"", customMyE:"",
   });
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -587,9 +607,17 @@ export default function App() {
     };
     setLocalRecords(p=>[...p,saved]);
     if(SCRIPT_URL!=="여기에_URL_붙여넣기") {
-      // 시트 저장 완료까지 대기 후 reload (no-cors라 응답 못 받음)
-      api.save(record).catch(()=>{});
-      setTimeout(() => loadRecords(), 1500);
+      // 시트 저장 후 결과 확인 (JSONP라 응답 받음)
+      api.save(record).then(res => {
+        if (res && res.error) {
+          showToast("⚠️ 시트 저장 실패: " + res.error, "error");
+        } else if (res && res.duplicate) {
+          // 이미 있는 ID라 무시됨 (정상)
+        }
+        loadRecords(); // 시트에서 다시 받아옴
+      }).catch(() => {
+        showToast("⚠️ 시트 저장 실패. 다시 시도해주세요", "error");
+      });
     }
     setFq({channel:null,phone:"",address:"",workType:null,openItems:[],installItems:[],surcharges:[],memo:"",reserveDate:"",reserveTime:"",noTravel:false});
     setFqStep("form");
@@ -2399,6 +2427,26 @@ export default function App() {
                   <div><div style={{fontSize:12,color:"#16a34a",fontWeight:700}}>준형 수령 예상</div><div style={{fontSize:11,color:"#aaa",marginTop:2}}>{isSoomgo?"숨고 100%":"사무실 50%"}</div></div>
                   <div style={{fontSize:20,fontWeight:900,color:"#16a34a"}}>{fmt(myE)}원</div>
                 </div>
+                
+                {/* 실제 받은 금액 직접 입력 (자동 계산 덮어쓰기) */}
+                <div style={{background:"#fef9c3",border:"1px solid #fde68a",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+                  <div style={{fontSize:11,color:"#92400e",fontWeight:700,letterSpacing:1,marginBottom:8}}>💰 실제 금액 (수동 입력 — 비워두면 자동 계산값 사용)</div>
+                  <div style={{display:"flex",gap:8}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:10,color:"#92400e",marginBottom:4}}>실제 청구액</div>
+                      <input className="input-field" type="number" placeholder={String(subTotal)}
+                        value={af.customTotal||""}
+                        onChange={e=>setAddForm(f=>({...f,customTotal:e.target.value}))} />
+                    </div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:10,color:"#92400e",marginBottom:4}}>실제 수령액</div>
+                      <input className="input-field" type="number" placeholder={String(myE)}
+                        value={af.customMyE||""}
+                        onChange={e=>setAddForm(f=>({...f,customMyE:e.target.value}))} />
+                    </div>
+                  </div>
+                </div>
+                
                 <textarea className="memo-input" placeholder="현장 메모" value={af.note||""} onChange={e=>setAddForm(f=>({...f,note:e.target.value}))} />
               </div>}
 
@@ -2409,6 +2457,9 @@ export default function App() {
                   const id=Date.now().toString();
                   const openLabel=(af.openItems||[]).map(i=>`${i.label}${i.qty>1?` ×${i.qty}`:""}`).join(", ");
                   const prodLabel=(af.products||[]).map(p=>`${p.brand} ${p.name}${(p.qty||1)>1?` ×${p.qty||1}`:""}`).join(", ");
+                  // 사용자가 실제 금액을 입력하면 그것을 사용, 아니면 자동 계산
+                  const finalTotal = af.customTotal !== "" && af.customTotal != null ? Number(af.customTotal) : subTotal;
+                  const finalMyE = af.customMyE !== "" && af.customMyE != null ? Number(af.customMyE) : myE;
                   const saved={
                     ID:id, 날짜:selectedDate, 시간:af.time||nowTime(),
                     채널:af.channel, 상태:af.status,
@@ -2416,17 +2467,23 @@ export default function App() {
                     작업유형:af.workType,
                     개문유형:openLabel, 개문금액:needOpen?openTotal:0,
                     제품명:prodLabel, 설치금액:needInstall?prodTotal:0,
-                    총금액:subTotal, 준형수령액:myE,
+                    총금액:finalTotal, 준형수령액:finalMyE,
                     자재원가:costTotal,
                     자재내역:(af.products||[]).map(p=>`${p.brand} ${p.name}${(p.qty||1)>1?` ×${p.qty||1}`:""}`).join(", "),
                     현장메모:af.note||"",
                   };
                   setLocalRecords(p=>[...p,saved]);
                   if(SCRIPT_URL!=="여기에_URL_붙여넣기") {
-                    api.save({id, date:selectedDate, time:saved.시간, channel:af.channel, status:af.status, phone:af.phone, address:af.address, workType:af.workType, openType:openLabel, product:prodLabel, total:subTotal, myEarnings:myE, materialCost:costTotal, note:af.note}).catch(()=>{});
-                    setTimeout(() => loadRecords(), 1500);
+                    api.save({id, date:selectedDate, time:saved.시간, channel:af.channel, status:af.status, phone:af.phone, address:af.address, workType:af.workType, openType:openLabel, product:prodLabel, total:finalTotal, myEarnings:finalMyE, materialCost:costTotal, note:af.note}).then(res => {
+                      if (res && res.error) {
+                        showToast("⚠️ 시트 저장 실패: " + res.error, "error");
+                      }
+                      loadRecords();
+                    }).catch(() => {
+                      showToast("⚠️ 시트 저장 실패. 다시 시도해주세요", "error");
+                    });
                   }
-                  setAddForm({channel:"office",time:"",workType:"",status:"완료",phone:"",address:"",note:"",openItems:[],products:[],productFilter:"전체",noTravel:false});
+                  setAddForm({channel:"office",time:"",workType:"",status:"완료",phone:"",address:"",note:"",openItems:[],products:[],productFilter:"전체",noTravel:false,customTotal:"",customMyE:""});
                   setShowAddRecord(false);
                   showToast("✅ 저장됐어요!");
                   setTimeout(() => setSaving(false), 2000);
@@ -2555,6 +2612,14 @@ function FinalQuoteView({ fnq, setFnq, onSave, onBack, showToast, isManual, sele
   if(f.step==="card") return (
     <>
       <div style={{padding:"24px 0 16px"}}>
+        {/* 고객 정보 수정 (카드 위 — 캡처에 안 들어감) */}
+        <div style={{padding:"0 16px 16px"}}>
+          <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:"#aaa",marginBottom:8}}>📝 고객 정보 (수정 가능)</div>
+          <div style={{display:"flex",flexDirection:"column",gap:8}}>
+            <input className="input-field" placeholder="연락처" value={f.phone||""} onChange={e=>set("phone",formatPhone(e.target.value))} />
+            <input className="input-field" placeholder="주소" value={f.address||""} onChange={e=>set("address",e.target.value)} />
+          </div>
+        </div>
         {/* 견적 카드 */}
         <div className="quote-card">
           <div className="qcard-head">
