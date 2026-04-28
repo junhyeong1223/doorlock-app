@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, Component } from "react";
 
 // ══════════════════════════════════════════════════
 // ⚠️  여기에 Apps Script 배포 URL 붙여넣기
@@ -257,6 +257,39 @@ const api = {
 // ════════════════════════════════════════════════
 // 메인 앱
 // ════════════════════════════════════════════════
+// ── 에러 바운더리: 한 컴포넌트에서 에러 나도 앱 전체 죽지 않게 ──
+class ErrorBoundary extends Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error, info) {
+    console.error("앱 에러:", error, info);
+  }
+  reset = () => this.setState({ hasError: false, error: null });
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{padding:"40px 20px",textAlign:"center"}}>
+          <div style={{fontSize:48,marginBottom:16}}>😵</div>
+          <div style={{fontSize:16,fontWeight:700,color:"#111",marginBottom:8}}>이 화면에서 오류가 발생했어요</div>
+          <div style={{fontSize:12,color:"#888",marginBottom:20,wordBreak:"break-all",padding:"0 20px"}}>
+            {String(this.state.error?.message || this.state.error || "알 수 없는 오류")}
+          </div>
+          <button onClick={() => { this.reset(); if (this.props.onReset) this.props.onReset(); }}
+            style={{padding:"12px 24px",borderRadius:12,border:"none",background:"#111",color:"#fff",fontFamily:"'Noto Sans KR',sans-serif",fontSize:14,fontWeight:700,cursor:"pointer"}}>
+            ← 캘린더로 돌아가기
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const [tab, setTab]       = useState("calendar"); // calendar | first | final
   const [records, setRecords] = useState([]);
@@ -531,6 +564,7 @@ export default function App() {
     const id          = Date.now().toString();
     const isReserve   = status==="예약" && fq.reserveDate;
     const record = {
+      id,
       date: isReserve ? fq.reserveDate : todayStr(),
       time: isReserve ? (fq.reserveTime||"00:00") : nowTime(),
       channel: fq.channel?.id || "",
@@ -582,8 +616,10 @@ export default function App() {
   const deleteRecord = (id) => {
     setLocalRecords(p=>p.filter(r=>String(r.ID)!==String(id)));
     setRecords(p=>p.filter(r=>String(r.ID)!==String(id)));
+    setAllTimeRecords(p=>p.filter(r=>String(r.ID)!==String(id)));
     if(SCRIPT_URL!=="여기에_URL_붙여넣기") {
       api.delete(id).catch(()=>{});
+      setTimeout(() => loadRecords(), 1500);
     }
     showToast("🗑 삭제됐어요");
   };
@@ -591,13 +627,14 @@ export default function App() {
   // ── 상태 변경 (Optimistic Update) ──
   const updateStatus = (id, status, extra={}) => {
     const fields = { 상태:status, ...extra };
-    // localRecords 업데이트
+    // 모든 캐시 즉시 업데이트
     setLocalRecords(p=>p.map(r=>String(r.ID)===String(id)?{...r,...fields}:r));
-    // records(시트 데이터)도 즉시 업데이트
     setRecords(p=>p.map(r=>String(r.ID)===String(id)?{...r,...fields}:r));
+    setAllTimeRecords(p=>p.map(r=>String(r.ID)===String(id)?{...r,...fields}:r));
     // 구글 시트 백그라운드 동기화
     if(SCRIPT_URL!=="여기에_URL_붙여넣기") {
       api.update(id, fields).catch(()=>{});
+      setTimeout(() => loadRecords(), 1500);
     }
   };
 
@@ -634,12 +671,20 @@ export default function App() {
         결제방법: breakdown.결제방법||"",
         출장비: breakdown.출장비 || (fnq.channel?.id==="soomgo" ? TRAVEL_FEE_SOOMGO : TRAVEL_FEE),
       };
-      // localRecords + records 즉시 업데이트
+      // localRecords + records 즉시 업데이트 (Optimistic UI)
       setLocalRecords(p=>p.map(r=>String(r.ID)===String(fnq.recordId)?{...r,...fields}:r));
       setRecords(p=>p.map(r=>String(r.ID)===String(fnq.recordId)?{...r,...fields}:r));
+      setAllTimeRecords(p=>p.map(r=>String(r.ID)===String(fnq.recordId)?{...r,...fields}:r));
+      
       if(SCRIPT_URL!=="여기에_URL_붙여넣기") {
         api.update(fnq.recordId, fields).catch(()=>{});
+        // 시트 업데이트가 끝난 후 reload (no-cors 대응)
+        setTimeout(() => loadRecords(), 1500);
       }
+      
+      // UX: 토스트 + 캘린더로 이동
+      showToast("✅ 완료 처리됐어요!");
+      setTab("calendar");
     }
   };
 
@@ -1892,7 +1937,11 @@ export default function App() {
         {/* 예약 설정 화면 제거됨 */}
 
         {/* ══════════ 최종 견적서 탭 ══════════ */}
-        {tab==="final" && <FinalQuoteView fnq={fnq} setFnq={setFnq} onSave={saveFinalQuote} onBack={()=>setTab("calendar")} showToast={showToast} />}
+        {tab==="final" && (
+          <ErrorBoundary onReset={()=>setTab("calendar")}>
+            <FinalQuoteView fnq={fnq} setFnq={setFnq} onSave={saveFinalQuote} onBack={()=>setTab("calendar")} showToast={showToast} />
+          </ErrorBoundary>
+        )}
 
         {/* 완료 카드 상세 모달 */}
         {viewRecord&&(
@@ -2345,7 +2394,7 @@ export default function App() {
                   };
                   setLocalRecords(p=>[...p,saved]);
                   if(SCRIPT_URL!=="여기에_URL_붙여넣기") {
-                    api.save({date:selectedDate,time:saved.시간,channel:af.channel,status:af.status,phone:af.phone,address:af.address,workType:af.workType,openType:openLabel,product:prodLabel,total:subTotal,myEarnings:myE,materialCost:costTotal,note:af.note}).catch(()=>{});
+                    api.save({id, date:selectedDate, time:saved.시간, channel:af.channel, status:af.status, phone:af.phone, address:af.address, workType:af.workType, openType:openLabel, product:prodLabel, total:subTotal, myEarnings:myE, materialCost:costTotal, note:af.note}).catch(()=>{});
                     setTimeout(() => loadRecords(), 1500);
                   }
                   setAddForm({channel:"office",time:"",workType:"",status:"완료",phone:"",address:"",note:"",openItems:[],products:[],productFilter:"전체",noTravel:false});
@@ -2408,7 +2457,33 @@ export default function App() {
 // 최종 견적서 컴포넌트
 // ════════════════════════════════════════════════
 function FinalQuoteView({ fnq, setFnq, onSave, onBack, showToast, isManual, selectedDate }) {
-  const f = fnq;
+  // 방어: fnq가 비어있거나 필수 필드가 없을 때 안전하게
+  const f = {
+    step: "form",
+    channel: null,
+    phone: "",
+    address: "",
+    workType: null,
+    openItems: [],
+    products: [],
+    reinforcements: [],
+    remodeling: "",
+    surcharges: [],
+    fieldNote: "",
+    filterType: "전체",
+    finalAdj: 0,
+    recordId: null,
+    payment: null,
+    etcItems: [],
+    ...(fnq || {}),
+  };
+  // 배열 필드 강제 보정 (혹시 시트에서 잘못된 값이 와도 안전)
+  if (!Array.isArray(f.openItems))     f.openItems = [];
+  if (!Array.isArray(f.products))      f.products = [];
+  if (!Array.isArray(f.reinforcements))f.reinforcements = [];
+  if (!Array.isArray(f.surcharges))    f.surcharges = [];
+  if (!Array.isArray(f.etcItems))      f.etcItems = [];
+  
   const set = (key, val) => setFnq(p=>({...p,[key]:val}));
 
   const needOpen    = f.workType?.id==="open"    || f.workType?.id==="both";
