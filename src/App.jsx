@@ -1271,8 +1271,35 @@ export default function App() {
 
                     {/* 액션 버튼 영역 (캡처 영역 밖) */}
                     <div style={{padding:"0 20px 20px"}}>
+                      {/* 🔒 내부 정보 (원가/차익) - 캡처 시 안 보임 */}
+                      <details style={{background:"#fafafa",borderRadius:10,padding:"10px 12px",marginTop:12,marginBottom:12,fontSize:12}}>
+                        <summary style={{cursor:"pointer",color:"#888",fontWeight:600}}>🔒 내부 정보 (원가/차익)</summary>
+                        <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:6,color:"#666"}}>
+                          <div style={{display:"flex",justifyContent:"space-between"}}>
+                            <span>원가</span>
+                            <span style={{fontWeight:700,color:"#111"}}>{fmt(selectedProd.cost||0)}원</span>
+                          </div>
+                          <div style={{display:"flex",justifyContent:"space-between"}}>
+                            <span>소매가 (사무실)</span>
+                            <span style={{fontWeight:700,color:"#111"}}>{fmt(selectedProd.price||0)}원</span>
+                          </div>
+                          <div style={{display:"flex",justifyContent:"space-between"}}>
+                            <span>숨고가 (70%)</span>
+                            <span style={{fontWeight:700,color:"#16a34a"}}>{fmt(soomgoPrice(selectedProd.price||0))}원</span>
+                          </div>
+                          <div style={{display:"flex",justifyContent:"space-between"}}>
+                            <span>사무실 차익</span>
+                            <span style={{fontWeight:700,color:"#2563eb"}}>{fmt((selectedProd.price||0)-(selectedProd.cost||0))}원</span>
+                          </div>
+                          <div style={{display:"flex",justifyContent:"space-between"}}>
+                            <span>숨고 차익</span>
+                            <span style={{fontWeight:700,color:"#16a34a"}}>{fmt(soomgoPrice(selectedProd.price||0)-(selectedProd.cost||0))}원</span>
+                          </div>
+                        </div>
+                      </details>
+                      
                       {productList.find(x=>x.id===selectedProd.id) && (
-                        <div style={{display:"flex",gap:8,marginTop:12}}>
+                        <div style={{display:"flex",gap:8}}>
                           <button style={{
                             flex:1,padding:"12px",borderRadius:12,border:"1px solid #ddd",
                             background:"#fff",color:"#111",fontFamily:"'Noto Sans KR',sans-serif",
