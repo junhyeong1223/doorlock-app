@@ -696,6 +696,8 @@ export default function App() {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=DM+Mono:wght@400;500&display=swap');
         @keyframes spin { to { transform: rotate(360deg); } }
+        details > summary::-webkit-details-marker { display: none; }
+        details > summary { list-style: none; }
         *{box-sizing:border-box;margin:0;padding:0;}
         body{background:#f4f4f2;font-family:'Noto Sans KR',sans-serif;}
         .app{min-height:100vh;max-width:420px;margin:0 auto;padding-bottom:calc(100px + env(safe-area-inset-bottom, 0px));}
@@ -1273,7 +1275,7 @@ export default function App() {
                     <div style={{padding:"0 20px 20px"}}>
                       {/* 🔒 내부 정보 (원가/차익) - 캡처 시 안 보임 */}
                       <details style={{background:"#fafafa",borderRadius:10,padding:"10px 12px",marginTop:12,marginBottom:12,fontSize:12}}>
-                        <summary style={{cursor:"pointer",color:"#888",fontWeight:600}}>🔒 내부 정보 (원가/차익)</summary>
+                        <summary style={{cursor:"pointer",textAlign:"center",fontSize:18,listStyle:"none",userSelect:"none"}}>🔒</summary>
                         <div style={{marginTop:10,display:"flex",flexDirection:"column",gap:6,color:"#666"}}>
                           <div style={{display:"flex",justifyContent:"space-between"}}>
                             <span>원가</span>
