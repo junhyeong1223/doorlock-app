@@ -1939,7 +1939,7 @@ export default function App() {
         {/* ══════════ 최종 견적서 탭 ══════════ */}
         {tab==="final" && (
           <ErrorBoundary onReset={()=>setTab("calendar")}>
-            <FinalQuoteView fnq={fnq} setFnq={setFnq} onSave={saveFinalQuote} onBack={()=>setTab("calendar")} showToast={showToast} />
+            <FinalQuoteView fnq={fnq} setFnq={setFnq} onSave={saveFinalQuote} onBack={()=>setTab("calendar")} showToast={showToast} allMaterials={allMaterials} />
           </ErrorBoundary>
         )}
 
@@ -2456,7 +2456,7 @@ export default function App() {
 // ════════════════════════════════════════════════
 // 최종 견적서 컴포넌트
 // ════════════════════════════════════════════════
-function FinalQuoteView({ fnq, setFnq, onSave, onBack, showToast, isManual, selectedDate }) {
+function FinalQuoteView({ fnq, setFnq, onSave, onBack, showToast, isManual, selectedDate, allMaterials = [] }) {
   // 방어: fnq가 비어있거나 필수 필드가 없을 때 안전하게
   const f = {
     step: "form",
