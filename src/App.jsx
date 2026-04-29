@@ -6,8 +6,8 @@ import { useState, useEffect, Component } from "react";
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw9pIOOLYgwbVC9UgEn04kIsI5P2wMdCkc_gqSu2LaoD9-UJoQd2-uc2ewvJ1yR0WSyaQ/exec";
 // ══════════════════════════════════════════════════
 // 앱 버전 (배포 시 자동 갱신용 - 화면에 작게 표시됨)
-const BUILD_VERSION = "v1.0.6";
-const BUILD_DATE = "2026-04-28";
+const BUILD_VERSION = "v1.0.7";
+const BUILD_DATE = "2026-04-29";
 // ══════════════════════════════════════════════════
 
 // ── 데이터 ────────────────────────────────────────
@@ -1602,7 +1602,7 @@ export default function App() {
         </>}
 
         {/* ══════════ 검색 탭 ══════════ */}
-        {tab==="search" && <>
+        {tab==="search" && <ErrorBoundary onReset={()=>{setSearchQuery(""); setTab("calendar");}}>
           <div className="page-top">
             <div className="page-title">작업 검색</div>
             <div className="page-sub">전화번호 · 주소 · 제품</div>
@@ -1720,7 +1720,7 @@ export default function App() {
                 })()
             }
           </div>
-        </>}
+        </ErrorBoundary>}
 
         {/* ══════════ 최초 견적서 탭 ══════════ */}
         {tab==="first" && <>
