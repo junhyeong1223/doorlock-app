@@ -1633,7 +1633,17 @@ export default function App() {
               ? <div className="empty">검색어를 입력하세요</div>
               : (() => {
                   const q = searchQuery.toLowerCase();
-                  // 전체 레코드에서 검색 (로컬 + 시트)
+                  
+                  // 자재 검색
+                  const materialResults = allMaterials.filter(m =>
+                    (m.name||"").toLowerCase().includes(q) ||
+                    (m.brand||"").toLowerCase().includes(q) ||
+                    (m.type||"").toLowerCase().includes(q) ||
+                    (m.note||"").toLowerCase().includes(q) ||
+                    (m.feature||"").toLowerCase().includes(q)
+                  );
+                  
+                  // 작업기록 검색 (로컬 + 시트)
                   const allSheetIds = new Set(allTimeRecords.map(r=>String(r.ID)));
                   const allRecs = [
                     ...allTimeRecords,
@@ -1649,9 +1659,34 @@ export default function App() {
                     (r.날짜||"").includes(q)
                   ).sort((a,b)=>b.날짜?.localeCompare(a.날짜));
 
-                  if(results.length===0) return <div className="empty">검색 결과가 없어요</div>;
+                  if(results.length===0 && materialResults.length===0) return <div className="empty">검색 결과가 없어요</div>;
 
-                  return results.map(r=>{
+                  return <>
+                    {/* 자재 검색 결과 */}
+                    {materialResults.length>0 && (
+                      <>
+                        <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:"#aaa",marginBottom:8,marginTop:4}}>📦 자재 ({materialResults.length})</div>
+                        {materialResults.map(m=>(
+                          <div key={m.id} style={{background:"#fff",borderRadius:12,padding:"12px 14px",marginBottom:8,cursor:"pointer",border:"1px solid #f0f0f0"}}
+                            onClick={()=>{setTab("products"); setSelectedProd(m); setSearchQuery("");}}>
+                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                              <div>
+                                <div style={{fontSize:11,color:"#aaa"}}>{m.brand} · {m.type}</div>
+                                <div style={{fontSize:14,fontWeight:700,color:"#111",marginTop:2}}>{m.name}</div>
+                                {m.note&&<div style={{fontSize:11,color:"#888",marginTop:2}}>{m.note}</div>}
+                              </div>
+                              <div style={{fontSize:13,fontWeight:700,color:"#111"}}>{fmt(m.price||0)}원</div>
+                            </div>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                    
+                    {/* 작업 검색 결과 */}
+                    {results.length>0 && (
+                      <>
+                        <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:"#aaa",marginBottom:8,marginTop:materialResults.length>0?16:4}}>🔧 작업 ({results.length})</div>
+                        {results.map(r=>{
                     const sc = STATUS_CONFIG[r.상태]||STATUS_CONFIG["견적대기"];
                     return (
                       <div key={r.ID} className={`rec-card ${r.채널}`} style={{marginBottom:10}}>
@@ -1678,7 +1713,10 @@ export default function App() {
                         )}
                       </div>
                     );
-                  });
+                  })}
+                      </>
+                    )}
+                  </>;
                 })()
             }
           </div>
