@@ -1235,7 +1235,7 @@ export default function App() {
 
           {/* 제품 상세 팝업 */}
           {selectedProd&&(()=>{
-            const isDoorlock = ["주키","보조키","푸쉬풀","강화유리"].includes(selectedProd.type);
+            const isDoorlock = ["주키","보조키","푸쉬풀","푸시풀","강화유리"].includes(selectedProd.type);
             return (
             <div className="modal-bg" onClick={()=>setSelectedProd(null)}>
               <div className="modal" style={{maxHeight:"90vh",overflowY:"auto",padding:0}} onClick={e=>e.stopPropagation()}>
