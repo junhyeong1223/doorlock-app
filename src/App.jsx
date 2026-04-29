@@ -5,6 +5,10 @@ import { useState, useEffect, Component } from "react";
 // ══════════════════════════════════════════════════
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw9pIOOLYgwbVC9UgEn04kIsI5P2wMdCkc_gqSu2LaoD9-UJoQd2-uc2ewvJ1yR0WSyaQ/exec";
 // ══════════════════════════════════════════════════
+// 앱 버전 (배포 시 자동 갱신용 - 화면에 작게 표시됨)
+const BUILD_VERSION = "v1.0.6";
+const BUILD_DATE = "2026-04-28";
+// ══════════════════════════════════════════════════
 
 // ── 데이터 ────────────────────────────────────────
 // actual = 최초 견적 표시 금액 (후려치기용), real = 실제 청구 기준
@@ -179,14 +183,14 @@ const api = {
   getMonth: async (month) => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return [];
     try {
-      const data = await fetchGAS(`${SCRIPT_URL}?action=getMonth&month=${month}&_=${Date.now()}`);
+      const data = await fetchGAS(`${SCRIPT_URL}?action=getMonth&month=${month}&_=${Date.now()}_${Math.random()}`);
       return Array.isArray(data) ? data : [];
     } catch(e) { return []; }
   },
   getAll: async () => {
     if (SCRIPT_URL === "여기에_URL_붙여넣기") return [];
     try {
-      const data = await fetchGAS(`${SCRIPT_URL}?action=getAll&_=${Date.now()}`);
+      const data = await fetchGAS(`${SCRIPT_URL}?action=getAll&_=${Date.now()}_${Math.random()}`);
       return Array.isArray(data) ? data : [];
     } catch(e) { return []; }
   },
@@ -620,7 +624,9 @@ export default function App() {
         } else if (res && res.duplicate) {
           // 이미 있는 ID라 무시됨 (정상)
         }
-        loadRecords(); // 시트에서 다시 받아옴
+        // 즉시 reload + 3초 후 한 번 더 (캐시/지연 대비)
+        loadRecords();
+        setTimeout(() => loadRecords(), 3000);
       }).catch(() => {
         showToast("⚠️ 시트 저장 실패. 다시 시도해주세요", "error");
       });
@@ -953,6 +959,7 @@ export default function App() {
                 <div style={{textAlign:"right"}}>
                   <div style={{fontSize:11,color:"rgba(255,255,255,.4)"}}>이번달 수령</div>
                   <div style={{fontSize:18,fontWeight:900,color:"#4ade80",fontFamily:"'DM Mono',monospace"}}>{fmt(monthEarnings)}원</div>
+                  <div style={{fontSize:9,color:"rgba(255,255,255,.25)",marginTop:2,fontFamily:"'DM Mono',monospace"}}>{BUILD_VERSION} · {BUILD_DATE}</div>
                 </div>
               </div>
             </div>
@@ -2604,6 +2611,7 @@ export default function App() {
                         showToast("⚠️ 시트 저장 실패: " + res.error, "error");
                       }
                       loadRecords();
+                      setTimeout(() => loadRecords(), 3000);
                     }).catch(() => {
                       showToast("⚠️ 시트 저장 실패. 다시 시도해주세요", "error");
                     });
