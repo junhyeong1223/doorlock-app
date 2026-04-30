@@ -6,7 +6,7 @@ import { useState, useEffect, Component } from "react";
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw9pIOOLYgwbVC9UgEn04kIsI5P2wMdCkc_gqSu2LaoD9-UJoQd2-uc2ewvJ1yR0WSyaQ/exec";
 // ══════════════════════════════════════════════════
 // 앱 버전 (배포 시 자동 갱신용 - 화면에 작게 표시됨)
-const BUILD_VERSION = "v1.0.7";
+const BUILD_VERSION = "v1.0.8";
 const BUILD_DATE = "2026-04-29";
 // ══════════════════════════════════════════════════
 
@@ -1602,10 +1602,10 @@ export default function App() {
         </>}
 
         {/* ══════════ 검색 탭 ══════════ */}
-        {tab==="search" && <ErrorBoundary onReset={()=>{setSearchQuery(""); setTab("calendar");}}>
+        {tab==="search" && <>
           <div className="page-top">
             <div className="page-title">작업 검색</div>
-            <div className="page-sub">전화번호 · 주소 · 제품</div>
+            <div className="page-sub">전화번호 · 주소 · 제품 · 자재</div>
           </div>
 
           {/* 검색창 */}
@@ -1615,7 +1615,7 @@ export default function App() {
               <input
                 className="input-field"
                 style={{paddingLeft:40,fontSize:15}}
-                placeholder="전화번호, 주소, 제품명으로 검색"
+                placeholder="전화번호, 주소, 제품명, 자재로 검색"
                 value={searchQuery}
                 onChange={e=>setSearchQuery(e.target.value)}
                 autoFocus
@@ -1635,7 +1635,7 @@ export default function App() {
                   const q = searchQuery.toLowerCase();
                   
                   // 자재 검색
-                  const materialResults = allMaterials.filter(m =>
+                  const materialResults = (allMaterials||[]).filter(m =>
                     (m.name||"").toLowerCase().includes(q) ||
                     (m.brand||"").toLowerCase().includes(q) ||
                     (m.type||"").toLowerCase().includes(q) ||
@@ -1643,7 +1643,7 @@ export default function App() {
                     (m.feature||"").toLowerCase().includes(q)
                   );
                   
-                  // 작업기록 검색 (로컬 + 시트)
+                  // 작업 검색
                   const allSheetIds = new Set(allTimeRecords.map(r=>String(r.ID)));
                   const allRecs = [
                     ...allTimeRecords,
@@ -1657,70 +1657,71 @@ export default function App() {
                     (r.개문유형||"").toLowerCase().includes(q) ||
                     (r.현장메모||"").toLowerCase().includes(q) ||
                     (r.날짜||"").includes(q)
-                  ).sort((a,b)=>b.날짜?.localeCompare(a.날짜));
+                  ).sort((a,b)=>String(b.날짜||"").localeCompare(String(a.날짜||"")));
 
-                  if(results.length===0 && materialResults.length===0) return <div className="empty">검색 결과가 없어요</div>;
+                  if(results.length===0 && materialResults.length===0) {
+                    return <div className="empty">검색 결과가 없어요</div>;
+                  }
 
-                  return <>
-                    {/* 자재 검색 결과 */}
-                    {materialResults.length>0 && (
-                      <>
-                        <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:"#aaa",marginBottom:8,marginTop:4}}>📦 자재 ({materialResults.length})</div>
-                        {materialResults.map(m=>(
-                          <div key={m.id} style={{background:"#fff",borderRadius:12,padding:"12px 14px",marginBottom:8,cursor:"pointer",border:"1px solid #f0f0f0"}}
-                            onClick={()=>{setTab("products"); setSelectedProd(m); setSearchQuery("");}}>
-                            <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
-                              <div>
-                                <div style={{fontSize:11,color:"#aaa"}}>{m.brand} · {m.type}</div>
-                                <div style={{fontSize:14,fontWeight:700,color:"#111",marginTop:2}}>{m.name}</div>
-                                {m.note&&<div style={{fontSize:11,color:"#888",marginTop:2}}>{m.note}</div>}
+                  return (
+                    <div>
+                      {materialResults.length > 0 && (
+                        <div style={{marginBottom:16}}>
+                          <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:"#aaa",marginBottom:8}}>📦 자재 ({materialResults.length})</div>
+                          {materialResults.map(m=>(
+                            <div key={m.id} style={{background:"#fff",borderRadius:12,padding:"12px 14px",marginBottom:8,cursor:"pointer",border:"1px solid #f0f0f0"}}
+                              onClick={()=>{setSelectedProd(m); setTab("products"); setSearchQuery("");}}>
+                              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+                                <div>
+                                  <div style={{fontSize:11,color:"#aaa"}}>{m.brand} · {m.type}</div>
+                                  <div style={{fontSize:14,fontWeight:700,color:"#111",marginTop:2}}>{m.name}</div>
+                                  {m.note && <div style={{fontSize:11,color:"#888",marginTop:2}}>{m.note}</div>}
+                                </div>
+                                <div style={{fontSize:13,fontWeight:700,color:"#111"}}>{fmt(m.price||0)}원</div>
                               </div>
-                              <div style={{fontSize:13,fontWeight:700,color:"#111"}}>{fmt(m.price||0)}원</div>
                             </div>
-                          </div>
-                        ))}
-                      </>
-                    )}
-                    
-                    {/* 작업 검색 결과 */}
-                    {results.length>0 && (
-                      <>
-                        <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:"#aaa",marginBottom:8,marginTop:materialResults.length>0?16:4}}>🔧 작업 ({results.length})</div>
-                        {results.map(r=>{
-                    const sc = STATUS_CONFIG[r.상태]||STATUS_CONFIG["견적대기"];
-                    return (
-                      <div key={r.ID} className={`rec-card ${r.채널}`} style={{marginBottom:10}}>
-                        <div className="rc-top">
-                          <div style={{display:"flex",gap:6,alignItems:"center"}}>
-                            <div className="rc-time" style={{color:"#555",fontWeight:700}}>{r.날짜}</div>
-                            <div className="rc-time">{r.시간}</div>
-                          </div>
-                          <div className="rc-status" style={{background:sc.bg,color:sc.color,fontSize:11,fontWeight:700,padding:"3px 8px",borderRadius:20}}>{sc.emoji} {r.상태}</div>
+                          ))}
                         </div>
-                        <div className="rc-work">{r.작업유형}</div>
-                        {r.주소&&<div className="rc-addr">📍 {r.주소}</div>}
-                        <div style={{marginTop:4}}>
-                          {r.개문유형&&<span className="rc-tag">🔑 {r.개문유형}</span>}
-                          {r.제품명&&<span className="rc-tag">🔒 {r.제품명}</span>}
-                          <span className="rc-tag">{r.채널==="office"?"사무실":"숨고"}</span>
+                      )}
+                      {results.length > 0 && (
+                        <div>
+                          <div style={{fontSize:11,fontWeight:700,letterSpacing:2,color:"#aaa",marginBottom:8}}>🔧 작업 ({results.length})</div>
+                          {results.map(r=>{
+                            const sc = STATUS_CONFIG[r.상태]||STATUS_CONFIG["견적대기"];
+                            return (
+                              <div key={r.ID} className={`rec-card ${r.채널}`} style={{marginBottom:10}}>
+                                <div className="rc-top">
+                                  <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                                    <div className="rc-time" style={{color:"#555",fontWeight:700}}>{r.날짜}</div>
+                                    <div className="rc-time">{r.시간}</div>
+                                  </div>
+                                  <div className="rc-status" style={{background:sc.bg,color:sc.color,fontSize:11,fontWeight:700,padding:"3px 8px",borderRadius:20}}>{sc.emoji} {r.상태}</div>
+                                </div>
+                                <div className="rc-work">{r.작업유형}</div>
+                                {r.주소&&<div className="rc-addr">📍 {r.주소}</div>}
+                                <div style={{marginTop:4}}>
+                                  {r.개문유형&&<span className="rc-tag">🔑 {r.개문유형}</span>}
+                                  {r.제품명&&<span className="rc-tag">🔒 {r.제품명}</span>}
+                                  <span className="rc-tag">{r.채널==="office"?"사무실":"숨고"}</span>
+                                </div>
+                                {r.현장메모&&<div className="rc-note">{r.현장메모}</div>}
+                                {r.상태==="완료"&&(
+                                  <div className="rc-bottom">
+                                    <div className="rc-total">{fmt(Number(r.총금액||0))}원</div>
+                                    <div className="rc-earn">준형 +{fmt(Number(r.준형수령액||0))}원</div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
-                        {r.현장메모&&<div className="rc-note">{r.현장메모}</div>}
-                        {r.상태==="완료"&&(
-                          <div className="rc-bottom">
-                            <div className="rc-total">{fmt(Number(r.총금액||0))}원</div>
-                            <div className="rc-earn">준형 +{fmt(Number(r.준형수령액||0))}원</div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                      </>
-                    )}
-                  </>;
+                      )}
+                    </div>
+                  );
                 })()
             }
           </div>
-        </ErrorBoundary>}
+        </>}
 
         {/* ══════════ 최초 견적서 탭 ══════════ */}
         {tab==="first" && <>
